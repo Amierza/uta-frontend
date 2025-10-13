@@ -1,6 +1,8 @@
 import { createRouter, createWebHistory } from "vue-router";
-import LoginPage from "../views/LoginPage.vue";
-import DashboardPage from "../views/DashboardPage.vue";
+import LoginPage from "../pages/LoginPage.vue";
+import DashboardPage from "../pages/DashboardPage.vue";
+import SessionsPage from "../pages/SessionsPage.vue";
+import WaitingRoomPage from "../pages/WaitingRoomPage.vue";
 
 const routes = [
   { path: "/", name: "Login", component: LoginPage },
@@ -9,6 +11,24 @@ const routes = [
     name: "Dashboard",
     component: DashboardPage,
     meta: { requiresAuth: true },
+  },
+  {
+    path: "/sessions",
+    name: "Sessions",
+    component: SessionsPage,
+    meta: {
+      requiresAuth: true,
+      title: "Semua Sesi Bimbingan",
+    },
+  },
+  {
+    path: "/waiting-room/:session_id",
+    name: "WaitingRoom",
+    component: WaitingRoomPage,
+    meta: {
+      requiresAuth: true,
+      title: "Ruang Tunggu",
+    },
   },
 ];
 
