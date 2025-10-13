@@ -83,7 +83,7 @@ onMounted(() => {
 
   if (token) {
     // Connect WebSocket for real-time updates with token
-    connect(`ws://localhost:8000/ws?token=${token}`);
+    connect(token);
 
     // Subscribe to session updates via WebSocket
     subscribe(`session:${sessionId.value}`);
