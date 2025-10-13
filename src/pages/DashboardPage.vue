@@ -121,12 +121,28 @@ const handleNewSession = async () => {
 // Setup WebSocket listeners
 const setupWebSocketListeners = () => {
   on("session_started", (data: any) => {
-    if (data.thesis_id && userType.value === "dosen") {
-      showToast(
-        `${data.student_name} telah memulai sesi baru.`,
-        "success",
-        5000
+    if (data.thesis_id && data.student_name) {
+      showToast(`${data.student_name} telah membuat sesi baru.`, "info");
+    } else {
+      const primarySupervisor = data.supervisors.find(
+        (s: any) => s.role === "primary_lecturer"
       );
+      const secondarySupervisor = data.supervisors.find(
+        (s: any) => s.role === "secondary_lecturer"
+      );
+
+      // Jika pembimbing utama yang mengawali sesi
+      if (primarySupervisor) {
+        showToast(`${primarySupervisor.name} telah membuat sesi baru.`, "info");
+      }
+
+      // Jika pembimbing sekunder yang mengawali sesi
+      if (secondarySupervisor) {
+        showToast(
+          `${secondarySupervisor.name} telah membuat sesi baru.`,
+          "info"
+        );
+      }
     }
   });
 };

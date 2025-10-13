@@ -1,5 +1,9 @@
 import { ref, type Ref } from "vue";
-import { getAllSessions, startNewSession } from "../api/session";
+import {
+  getAllSessions,
+  startNewSession,
+  getSessionDetail,
+} from "../api/session";
 import type { SessionResponse } from "../types/session";
 
 export function useSessions(
@@ -8,6 +12,8 @@ export function useSessions(
   userIdentifier: Ref<string>
 ) {
   const sessions = ref<SessionResponse[]>([]);
+  const sessionDetail = ref<SessionResponse | null>(null);
+  const isLoadingDetail = ref(false);
   const isLoadingSessions = ref(false);
   const isStartingSession = ref(false);
   const error = ref<string | null>(null);
@@ -55,6 +61,37 @@ export function useSessions(
     }
   };
 
+  const fetchSessionDetail = async (sessionId: string) => {
+    if (!sessionId) {
+      error.value = "Session ID tidak valid";
+      return;
+    }
+
+    try {
+      isLoadingDetail.value = true;
+      error.value = null;
+
+      const response = await getSessionDetail(sessionId);
+
+      if (response.status && response.data) {
+        const data = Array.isArray(response.data)
+          ? response.data[0]
+          : response.data;
+        sessionDetail.value = data;
+
+        return data;
+      } else {
+        throw new Error("Data sesi tidak ditemukan");
+      }
+    } catch (err: any) {
+      console.error("❌ Error fetching session detail:", err);
+      error.value = err.response?.data?.message || "Gagal memuat detail sesi";
+      sessionDetail.value = null;
+    } finally {
+      isLoadingDetail.value = false;
+    }
+  };
+
   const startSession = async (thesisId: string) => {
     if (!thesisId) {
       error.value = "Thesis ID tidak ditemukan";
@@ -99,10 +136,13 @@ export function useSessions(
 
   return {
     sessions,
+    sessionDetail,
     isLoadingSessions,
     isStartingSession,
     error,
+    // methods
     fetchSessions,
     startSession,
+    fetchSessionDetail,
   };
 }

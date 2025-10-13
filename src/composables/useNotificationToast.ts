@@ -13,7 +13,7 @@ export function useNotificationToast() {
   const show = (
     message: string,
     type: "info" | "success" | "warning" | "error" = "info",
-    duration: number = 5000
+    duration: number = 15000
   ) => {
     const id = `toast-${Date.now()}-${Math.random()}`;
     const toast: Toast = { id, message, type, duration };

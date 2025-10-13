@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import { getSessionDetail } from "../api/session";
+import { useSessions } from "../composables/useSession";
 import { useWebSocket } from "../composables/useWebsocket";
 import { useNotificationToast } from "../composables/useNotificationToast";
+import { useUser } from "../composables/useUser";
 import type { SessionResponse } from "../types/session";
 import ToastNotification from "../components/ToastNotification.vue";
 
@@ -16,93 +17,45 @@ const isLoading = ref(true);
 const error = ref<string | null>(null);
 const elapsedTime = ref(0);
 const timeInterval = ref<number | null>(null);
-const joinedSupervisors = ref<string[]>([]);
 
 // Use centralized WebSocket
 const { on, isConnected } = useWebSocket();
 const { show: showToast } = useNotificationToast();
+const { userId, userType, userIdentifier } = useUser();
+const { fetchSessionDetail } = useSessions(userId, userType, userIdentifier);
 
 // Unsubscribe functions
 let unsubscribeFunctions: Function[] = [];
 
-// Fetch session detail
-const fetchSessionDetail = async () => {
-  try {
-    const response = await getSessionDetail(sessionId.value);
-
-    if (response.status && response.data) {
-      session.value = Array.isArray(response.data)
-        ? response.data[0]
-        : response.data;
-
-      // Check if session is active (both supervisors joined)
-      if (session.value && session.value.status === "active") {
-        console.log("✅ Session is now active! Redirecting...");
-        stopTimer();
-        router.push(`/session/${sessionId.value}`);
-      }
-    }
-  } catch (err: any) {
-    console.error("❌ Error fetching session detail:", err);
-    error.value = err.response?.data?.message || "Gagal memuat detail sesi";
-  } finally {
-    isLoading.value = false;
-  }
-};
-
 // Setup WebSocket listeners
 const setupWebSocketListeners = () => {
   // Listen for primary lecturer joined
-  const unsubPrimary = on("primary_lecturer_joined", (data: any) => {
-    console.log("🎯 Primary lecturer joined:", data);
-
-    if (data.thesis_id && session.value?.thesis.id === data.thesis_id) {
-      const supervisorName = data.supervisors[0]?.name;
-      if (supervisorName) {
-        showToast(
-          `${supervisorName} (Pembimbing 1) telah bergabung`,
-          "success",
-          5000
-        );
-        joinedSupervisors.value.push("primary");
-        fetchSessionDetail();
-      }
+  on("primary_lecturer_joined", (data: any) => {
+    if (data.thesis_id) {
+      showToast(
+        `${data.supervisors[0]?.name} (Pembimbing 1) telah bergabung.`,
+        "success"
+      );
     }
+
+    setTimeout(() => {
+      router.push(`/session/${sessionId.value}`);
+    }, 2000);
   });
 
   // Listen for secondary lecturer joined
-  const unsubSecondary = on("secondary_lecturer_joined", (data: any) => {
-    console.log("🎯 Secondary lecturer joined:", data);
-
-    if (data.thesis_id && session.value?.thesis.id === data.thesis_id) {
-      const supervisorName = data.supervisors[1]?.name;
-      if (supervisorName) {
-        showToast(
-          `${supervisorName} (Pembimbing 2) telah bergabung`,
-          "success",
-          5000
-        );
-        joinedSupervisors.value.push("secondary");
-
-        // Check if both supervisors joined
-        if (joinedSupervisors.value.length === 2) {
-          showToast(
-            "Kedua pembimbing telah bergabung! Mengarahkan ke ruang bimbingan...",
-            "success",
-            3000
-          );
-
-          setTimeout(() => {
-            router.push(`/session/${sessionId.value}`);
-          }, 2000);
-        } else {
-          fetchSessionDetail();
-        }
-      }
+  on("secondary_lecturer_joined", (data: any) => {
+    if (data.thesis_id) {
+      showToast(
+        `${data.supervisors[1]?.name} (Pembimbing 2) telah bergabung.`,
+        "success"
+      );
     }
-  });
 
-  unsubscribeFunctions = [unsubPrimary, unsubSecondary];
+    setTimeout(() => {
+      router.push(`/session/${sessionId.value}`);
+    }, 2000);
+  });
 };
 
 // Start timer
@@ -139,7 +92,7 @@ onMounted(() => {
   }
 
   // Initial fetch
-  fetchSessionDetail();
+  fetchSessionDetail(sessionId.value);
 
   // Setup WebSocket listeners
   setupWebSocketListeners();
