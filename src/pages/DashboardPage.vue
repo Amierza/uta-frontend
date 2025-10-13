@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 
 // Composables
@@ -115,11 +115,6 @@ const logout = () => {
   localStorage.clear();
   router.push("/");
 };
-
-// Watch for thesis ID changes (for debugging)
-watch(userThesisId, (newValue) => {
-  console.log("userThesisId changed:", newValue);
-});
 
 // Lifecycle
 onMounted(async () => {
