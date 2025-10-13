@@ -45,6 +45,7 @@ const {
   isStartingSession,
   fetchSessions,
   startSession,
+  joinActiveSession,
 } = useSessions(userId, userType, userIdentifier);
 
 // State untuk notifikasi toast
@@ -80,8 +81,20 @@ const handleQuickAction = (action: string) => {
   if (route) router.push(route);
 };
 
-const handleSessionClick = (sessionId: string) => {
-  router.push(`/session/${sessionId}`);
+const handleSessionClick = async (sessionId: string) => {
+  try {
+    // Hit API join session terlebih dahulu
+    await joinActiveSession(sessionId);
+
+    // Kalau berhasil, baru redirect
+    router.push(`/session/${sessionId}`);
+  } catch (error: any) {
+    console.error("Failed to join session:", error);
+    showToast(
+      error.message || "Gagal bergabung ke sesi. Silakan coba lagi.",
+      "error"
+    );
+  }
 };
 
 const handleNewSession = async () => {

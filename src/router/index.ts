@@ -3,6 +3,7 @@ import LoginPage from "../pages/LoginPage.vue";
 import DashboardPage from "../pages/DashboardPage.vue";
 import SessionsPage from "../pages/SessionsPage.vue";
 import WaitingRoomPage from "../pages/WaitingRoomPage.vue";
+import ChatSessionPage from "../pages/ChatSessionPage.vue";
 
 const routes = [
   { path: "/", name: "Login", component: LoginPage },
@@ -28,6 +29,15 @@ const routes = [
     meta: {
       requiresAuth: true,
       title: "Ruang Tunggu",
+    },
+  },
+  {
+    path: "/sessions/:session_id",
+    name: "ChattingSession",
+    component: ChatSessionPage,
+    meta: {
+      requiresAuth: true,
+      title: "Halaman Chatting",
     },
   },
 ];

@@ -31,7 +31,6 @@ export function useUser() {
           userName.value = userData.lecturer.name;
           userIdentifier.value = userData.lecturer.nip;
           userEmail.value = userData.lecturer.email;
-          userThesisId.value = userData.thesis_id;
           userTotalStudent.value = userData.lecturer.total_student;
           userStudyProgram.value = userData.lecturer.study_program.name;
           userFaculty.value = userData.lecturer.study_program.faculty.name;

@@ -3,6 +3,7 @@ import {
   getAllSessions,
   startNewSession,
   getSessionDetail,
+  joinSession,
 } from "../api/session";
 import type { SessionResponse } from "../types/session";
 
@@ -134,6 +135,40 @@ export function useSessions(
     }
   };
 
+  const isJoiningSession = ref(false);
+
+  const joinActiveSession = async (sessionId: string) => {
+    if (!sessionId) {
+      error.value = "Session ID tidak valid";
+      throw new Error("Session ID tidak valid");
+    }
+
+    isJoiningSession.value = true;
+    error.value = null;
+
+    try {
+      const response = await joinSession(sessionId);
+
+      if (response.status && response.data) {
+        // Return single session data or first item if array
+        const sessionData = Array.isArray(response.data)
+          ? response.data[0]
+          : response.data;
+
+        return sessionData;
+      } else {
+        throw new Error(response.message || "Gagal bergabung ke sesi");
+      }
+    } catch (err: any) {
+      console.error("Error joining session:", err);
+      error.value =
+        err.response?.data?.message || err.message || "Gagal bergabung ke sesi";
+      throw err;
+    } finally {
+      isJoiningSession.value = false;
+    }
+  };
+
   return {
     sessions,
     sessionDetail,
@@ -145,5 +180,6 @@ export function useSessions(
     fetchSessions,
     startSession,
     fetchSessionDetail,
+    joinActiveSession,
   };
 }
