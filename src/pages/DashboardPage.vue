@@ -7,6 +7,7 @@ import { useUser } from "../composables/useUser";
 import { useNotifications } from "../composables/useNotification";
 import { useSessions } from "../composables/useSession";
 import { useNotificationToast } from "../composables/useNotificationToast";
+import { useWebSocket } from "../composables/useWebsocket";
 
 // Components
 import DashboardHeader from "../components/DashboardHeader.vue";
@@ -49,6 +50,7 @@ const {
 // State untuk notifikasi toast
 const toastNotifications = ref([]); // Menyimpan notifikasi toast
 const { show: showToast } = useNotificationToast(); // Mengambil fungsi untuk menampilkan toast
+const { on } = useWebSocket(); // Ambil fungsi dari WebSocket
 
 // Dashboard data (could be moved to composable if needed)
 const progressData = ref({
@@ -102,7 +104,7 @@ const handleNewSession = async () => {
 
     if (sessionData && sessionData.id) {
       // Redirect ke waiting room dengan session_id
-      showToast("Sesi baru telah dimulai!", "success"); // Notifikasi saat sesi dimulai
+      showToast("Sesi baru telah dibuat!, mohon tunggu...", "info"); // Notifikasi saat sesi dimulai
       router.push(`/waiting-room/${sessionData.id}`);
     } else {
       throw new Error("Session ID tidak ditemukan dalam response");
@@ -116,6 +118,19 @@ const handleNewSession = async () => {
   }
 };
 
+// Setup WebSocket listeners
+const setupWebSocketListeners = () => {
+  on("session_started", (data: any) => {
+    if (data.thesis_id && userType.value === "dosen") {
+      showToast(
+        `${data.student_name} telah memulai sesi baru.`,
+        "success",
+        5000
+      );
+    }
+  });
+};
+
 const logout = () => {
   localStorage.clear();
   router.push("/");
@@ -124,8 +139,8 @@ const logout = () => {
 // Lifecycle
 onMounted(async () => {
   await fetchUserProfile();
-
   await Promise.all([fetchNotifications(), fetchSessions()]);
+  setupWebSocketListeners();
 });
 </script>
 
