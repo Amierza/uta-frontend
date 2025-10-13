@@ -137,6 +137,7 @@ export function useSessions(
   return {
     sessions,
     sessionDetail,
+    isLoadingDetail,
     isLoadingSessions,
     isStartingSession,
     error,

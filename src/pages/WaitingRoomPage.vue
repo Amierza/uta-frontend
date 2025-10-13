@@ -13,7 +13,6 @@ const route = useRoute();
 
 const sessionId = ref<string>(route.params.session_id as string);
 const session = ref<SessionResponse | null>(null);
-const isLoading = ref(true);
 const error = ref<string | null>(null);
 const elapsedTime = ref(0);
 const timeInterval = ref<number | null>(null);
@@ -22,7 +21,11 @@ const timeInterval = ref<number | null>(null);
 const { on, isConnected } = useWebSocket();
 const { show: showToast } = useNotificationToast();
 const { userId, userType, userIdentifier } = useUser();
-const { fetchSessionDetail } = useSessions(userId, userType, userIdentifier);
+const { fetchSessionDetail, isLoadingDetail } = useSessions(
+  userId,
+  userType,
+  userIdentifier
+);
 
 // Unsubscribe functions
 let unsubscribeFunctions: Function[] = [];
@@ -85,6 +88,17 @@ const copySessionId = () => {
   showToast("Session ID berhasil disalin!", "success", 3000);
 };
 
+onMounted(async () => {
+  try {
+    if (!sessionId.value) throw new Error("Session ID tidak ditemukan");
+
+    const data = await fetchSessionDetail(sessionId.value);
+    session.value = data;
+  } catch (err: any) {
+    error.value = err.message || "Gagal memuat sesi";
+  }
+});
+
 onMounted(() => {
   if (!sessionId.value) {
     error.value = "Session ID tidak ditemukan";
@@ -118,7 +132,7 @@ onUnmounted(() => {
     <div class="max-w-2xl w-full">
       <!-- Loading State -->
       <div
-        v-if="isLoading"
+        v-if="isLoadingDetail"
         class="bg-white rounded-3xl shadow-xl p-12 text-center"
       >
         <div
