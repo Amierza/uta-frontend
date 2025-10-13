@@ -4,9 +4,11 @@ import { ref, onUnmounted } from "vue";
 let wsInstance: WebSocket | null = null;
 let reconnectTimeout: number | null = null;
 
+// Event listeners registry
+const eventListeners: Map<string, Set<Function>> = new Map();
+
 export function useWebSocket() {
   const isConnected = ref(false);
-  const notifications = ref<any[]>([]);
   const latestMessage = ref<any>(null);
 
   const WS_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8000/ws";
@@ -16,7 +18,7 @@ export function useWebSocket() {
   const connect = (token: string) => {
     // If already connected, don't create new connection
     if (wsInstance && wsInstance.readyState === WebSocket.OPEN) {
-      console.log("WebSocket already connected");
+      console.log("✅ WebSocket already connected");
       isConnected.value = true;
       return wsInstance;
     }
@@ -42,19 +44,8 @@ export function useWebSocket() {
 
           latestMessage.value = message;
 
-          // Handle different message types
-          if (message.type === "notification") {
-            notifications.value.unshift(message.data);
-          } else if (message.type === "session_joined") {
-            // Session joined notification
-            console.log("👥 Someone joined the session:", message.data);
-          } else if (message.type === "session_updated") {
-            // Session updated notification
-            console.log("🔄 Session updated:", message.data);
-          } else if (message.type === "online_status") {
-            // Online status update
-            console.log("🟢 Online status update:", message.data);
-          }
+          // Trigger event listeners
+          triggerEventListeners(message.event, message);
         } catch (err) {
           console.error("Error parsing WebSocket message:", err);
         }
@@ -99,6 +90,7 @@ export function useWebSocket() {
       reconnectTimeout = null;
     }
     isConnected.value = false;
+    eventListeners.clear();
   };
 
   // Send message through WebSocket
@@ -112,20 +104,48 @@ export function useWebSocket() {
     }
   };
 
-  // Subscribe to a channel
-  const subscribe = (channel: string) => {
-    return send({
-      type: "subscribe",
-      channel: channel,
-    });
+  // Register event listener
+  const on = (eventName: string, callback: Function) => {
+    if (!eventListeners.has(eventName)) {
+      eventListeners.set(eventName, new Set());
+    }
+    eventListeners.get(eventName)!.add(callback);
+
+    // Return unsubscribe function
+    return () => {
+      const listeners = eventListeners.get(eventName);
+      if (listeners) {
+        listeners.delete(callback);
+      }
+    };
   };
 
-  // Unsubscribe from a channel
-  const unsubscribe = (channel: string) => {
-    return send({
-      type: "unsubscribe",
-      channel: channel,
-    });
+  // Trigger event listeners
+  const triggerEventListeners = (eventName: string, data: any) => {
+    const listeners = eventListeners.get(eventName);
+    if (listeners) {
+      listeners.forEach((callback) => {
+        try {
+          callback(data);
+        } catch (err) {
+          console.error(`Error in event listener for ${eventName}:`, err);
+        }
+      });
+    }
+  };
+
+  // Remove event listener
+  const off = (eventName: string, callback?: Function) => {
+    if (!callback) {
+      // Remove all listeners for this event
+      eventListeners.delete(eventName);
+    } else {
+      // Remove specific listener
+      const listeners = eventListeners.get(eventName);
+      if (listeners) {
+        listeners.delete(callback);
+      }
+    }
   };
 
   // Get WebSocket instance
@@ -139,13 +159,12 @@ export function useWebSocket() {
 
   return {
     isConnected,
-    notifications,
     latestMessage,
     connect,
     disconnect,
     send,
-    subscribe,
-    unsubscribe,
+    on,
+    off,
     getInstance,
   };
 }

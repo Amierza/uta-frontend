@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { getSessionDetail } from "../api/session";
 import { useWebSocket } from "../composables/useWebsocket";
+import { useNotificationToast } from "../composables/useNotificationToast";
 import type { SessionResponse } from "../types/session";
+import ToastNotification from "../components/ToastNotification.vue";
 
 const router = useRouter();
 const route = useRoute();
@@ -12,10 +14,16 @@ const sessionId = ref<string>(route.params.session_id as string);
 const session = ref<SessionResponse | null>(null);
 const isLoading = ref(true);
 const error = ref<string | null>(null);
-const notifications = ref<string[]>([]); // Menyimpan notifikasi
+const elapsedTime = ref(0);
+const timeInterval = ref<number | null>(null);
+const joinedSupervisors = ref<string[]>([]);
 
 // Use centralized WebSocket
-const { latestMessage, subscribe, connect, disconnect } = useWebSocket();
+const { on, isConnected } = useWebSocket();
+const { show: showToast } = useNotificationToast();
+
+// Unsubscribe functions
+let unsubscribeFunctions: Function[] = [];
 
 // Fetch session detail
 const fetchSessionDetail = async () => {
@@ -26,6 +34,13 @@ const fetchSessionDetail = async () => {
       session.value = Array.isArray(response.data)
         ? response.data[0]
         : response.data;
+
+      // Check if session is active (both supervisors joined)
+      if (session.value && session.value.status === "active") {
+        console.log("✅ Session is now active! Redirecting...");
+        stopTimer();
+        router.push(`/session/${sessionId.value}`);
+      }
     }
   } catch (err: any) {
     console.error("❌ Error fetching session detail:", err);
@@ -35,42 +50,94 @@ const fetchSessionDetail = async () => {
   }
 };
 
-// Watch for WebSocket messages
-watch(latestMessage, (message) => {
-  if (!message) return;
+// Setup WebSocket listeners
+const setupWebSocketListeners = () => {
+  // Listen for primary lecturer joined
+  const unsubPrimary = on("primary_lecturer_joined", (data: any) => {
+    console.log("🎯 Primary lecturer joined:", data);
 
-  console.log("📨 Received WebSocket message in waiting room:", message);
+    if (data.thesis_id && session.value?.thesis.id === data.thesis_id) {
+      const supervisorName = data.supervisors[0]?.name;
+      if (supervisorName) {
+        showToast(
+          `${supervisorName} (Pembimbing 1) telah bergabung`,
+          "success",
+          5000
+        );
+        joinedSupervisors.value.push("primary");
+        fetchSessionDetail();
+      }
+    }
+  });
 
-  // Cek jenis pesan dan tampilkan notifikasi
-  if (message.type === "session_started") {
-    notifications.value.push(`${message.student_name} telah memulai sesi.`);
-  } else if (message.type === "primary_lecturer_joined") {
-    notifications.value.push(
-      `${message.supervisors[0].name} (Dosen Pembimbing 1) telah bergabung.`
-    );
-  } else if (message.type === "secondary_lecturer_joined") {
-    notifications.value.push(
-      `${message.supervisors[1].name} (Dosen Pembimbing 2) telah bergabung.`
-    );
+  // Listen for secondary lecturer joined
+  const unsubSecondary = on("secondary_lecturer_joined", (data: any) => {
+    console.log("🎯 Secondary lecturer joined:", data);
+
+    if (data.thesis_id && session.value?.thesis.id === data.thesis_id) {
+      const supervisorName = data.supervisors[1]?.name;
+      if (supervisorName) {
+        showToast(
+          `${supervisorName} (Pembimbing 2) telah bergabung`,
+          "success",
+          5000
+        );
+        joinedSupervisors.value.push("secondary");
+
+        // Check if both supervisors joined
+        if (joinedSupervisors.value.length === 2) {
+          showToast(
+            "Kedua pembimbing telah bergabung! Mengarahkan ke ruang bimbingan...",
+            "success",
+            3000
+          );
+
+          setTimeout(() => {
+            router.push(`/session/${sessionId.value}`);
+          }, 2000);
+        } else {
+          fetchSessionDetail();
+        }
+      }
+    }
+  });
+
+  unsubscribeFunctions = [unsubPrimary, unsubSecondary];
+};
+
+// Start timer
+const startTimer = () => {
+  timeInterval.value = window.setInterval(() => {
+    elapsedTime.value++;
+  }, 1000);
+};
+
+// Stop timer
+const stopTimer = () => {
+  if (timeInterval.value) {
+    clearInterval(timeInterval.value);
+    timeInterval.value = null;
   }
-
-  // Jika pesan terkait sesi ini, ambil detail terbaru
-  if (message.data?.session_id === sessionId.value) {
-    fetchSessionDetail();
-  }
-});
+};
 
 // Cancel and go back
 const handleCancel = async () => {
-  disconnect();
+  stopTimer();
   router.push("/dashboard");
 };
 
 // Copy session ID to clipboard
 const copySessionId = () => {
   navigator.clipboard.writeText(sessionId.value);
-  alert("Session ID berhasil disalin!");
+  showToast("Session ID berhasil disalin!", "success", 3000);
 };
+
+// Format elapsed time
+// const formatTime = (seconds: number) => {
+//   const mins = Math.floor(seconds / 60);
+//   const secs = seconds % 60;
+//   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+// };
 
 onMounted(() => {
   if (!sessionId.value) {
@@ -78,23 +145,20 @@ onMounted(() => {
     return;
   }
 
-  // Get the token from localStorage
-  const token = localStorage.getItem("access_token");
-
-  if (token) {
-    // Connect WebSocket for real-time updates with token
-    connect(token);
-
-    // Subscribe to session updates via WebSocket
-    subscribe(`session:${sessionId.value}`);
-  }
-
-  // Initial fetch to load session detail
+  // Initial fetch
   fetchSessionDetail();
+
+  // Setup WebSocket listeners
+  setupWebSocketListeners();
+
+  // Start timer
+  startTimer();
 });
 
 onUnmounted(() => {
-  disconnect();
+  stopTimer();
+  // Cleanup WebSocket listeners
+  unsubscribeFunctions.forEach((unsub) => unsub());
 });
 </script>
 
@@ -102,6 +166,9 @@ onUnmounted(() => {
   <div
     class="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4"
   >
+    <!-- Toast Notifications -->
+    <ToastNotification />
+
     <div class="max-w-2xl w-full">
       <!-- Loading State -->
       <div
@@ -153,6 +220,26 @@ onUnmounted(() => {
         <div
           class="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white text-center relative"
         >
+          <!-- Connection Status Badge -->
+          <div class="absolute top-4 right-4">
+            <span
+              :class="[
+                'inline-flex items-center px-3 py-1 rounded-full text-xs font-medium',
+                isConnected
+                  ? 'bg-green-500/20 text-green-100'
+                  : 'bg-yellow-500/20 text-yellow-100',
+              ]"
+            >
+              <span
+                :class="[
+                  'w-2 h-2 rounded-full mr-2',
+                  isConnected ? 'bg-green-300 animate-pulse' : 'bg-yellow-300',
+                ]"
+              ></span>
+              {{ isConnected ? "Terhubung" : "Menghubungkan..." }}
+            </span>
+          </div>
+
           <div
             class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4"
           >
@@ -178,6 +265,23 @@ onUnmounted(() => {
 
         <!-- Content -->
         <div class="p-8">
+          <!-- Animated Waiting Indicator -->
+          <div class="flex justify-center items-center space-x-3 mb-8">
+            <div
+              class="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+              style="animation-delay: 0s"
+            ></div>
+            <div
+              class="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+              style="animation-delay: 0.2s"
+            ></div>
+            <div
+              class="w-3 h-3 bg-blue-600 rounded-full animate-bounce"
+              style="animation-delay: 0.4s"
+            ></div>
+          </div>
+
+          <!-- Session Info -->
           <div class="bg-gray-50 rounded-2xl p-6 mb-6">
             <h3 class="font-semibold text-gray-900 mb-4 flex items-center">
               <svg
@@ -195,51 +299,56 @@ onUnmounted(() => {
               </svg>
               Informasi Sesi
             </h3>
-            <div class="flex items-start justify-between">
-              <span class="text-sm text-gray-600">Session ID</span>
-              <code
-                class="text-sm font-mono bg-white px-3 py-1.5 rounded-lg border border-gray-200 break-all max-w-xs text-right"
+
+            <div class="space-y-3">
+              <div class="flex items-start justify-between">
+                <span class="text-sm text-gray-600">Session ID</span>
+                <div class="flex flex-col items-end space-y-2">
+                  <code
+                    class="text-sm font-mono bg-white px-3 py-1.5 rounded-lg border border-gray-200 break-all max-w-xs text-right"
+                  >
+                    {{ sessionId }}
+                  </code>
+                </div>
+              </div>
+              <div class="flex items-center mt-3">
+                <button
+                  @click="copySessionId"
+                  class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors text-xs font-medium"
+                >
+                  Salin Session ID
+                </button>
+              </div>
+              <!-- Display Session Info -->
+              <div
+                class="flex items-center justify-between pt-3 border-t border-gray-200"
               >
-                {{ sessionId }}
-              </code>
+                <span class="text-sm text-gray-600">Judul Skripsi</span>
+                <p class="text-sm text-gray-900 font-medium" v-if="session">
+                  {{ session.thesis.title }}
+                </p>
+              </div>
             </div>
-            <div class="flex items-center mt-3">
+
+            <!-- Actions -->
+            <div class="flex space-x-3">
               <button
-                @click="copySessionId"
-                class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors text-xs font-medium"
+                @click="handleCancel"
+                class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
               >
-                Salin Session ID
+                Batalkan
               </button>
             </div>
-            <!-- Display Session Info -->
-            <div
-              class="flex items-center justify-between pt-3 border-t border-gray-200"
-            >
-              <span class="text-sm text-gray-600">Judul Skripsi</span>
-              <p class="text-sm text-gray-900 font-medium" v-if="session">
-                {{ session.thesis.title }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex space-x-3">
-            <button
-              @click="handleCancel"
-              class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
-            >
-              Batalkan
-            </button>
           </div>
         </div>
-      </div>
 
-      <!-- Tips -->
-      <div class="mt-6 text-center">
-        <p class="text-sm text-gray-600">
-          💡 <span class="font-medium">Tips:</span> Pastikan dosen pembimbing
-          memiliki Session ID untuk bergabung
-        </p>
+        <!-- Tips -->
+        <div class="mt-6 text-center">
+          <p class="text-sm text-gray-600">
+            💡 <span class="font-medium">Tips:</span> Pastikan dosen pembimbing
+            memiliki Session ID untuk bergabung
+          </p>
+        </div>
       </div>
     </div>
   </div>

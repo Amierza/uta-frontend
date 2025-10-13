@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { useRouter } from "vue-router";
 
 // Composables
@@ -23,7 +23,6 @@ const {
   userType,
   userName,
   userIdentifier,
-  // userEmail,
   userThesisId,
   userPhoto,
   userTotalStudent,
@@ -117,9 +116,15 @@ const logout = () => {
   router.push("/");
 };
 
+// Watch for thesis ID changes (for debugging)
+watch(userThesisId, (newValue) => {
+  console.log("userThesisId changed:", newValue);
+});
+
 // Lifecycle
 onMounted(async () => {
   await fetchUserProfile();
+
   await Promise.all([fetchNotifications(), fetchSessions()]);
 });
 </script>
