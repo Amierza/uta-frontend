@@ -6,6 +6,7 @@ import { useRouter } from "vue-router";
 import { useUser } from "../composables/useUser";
 import { useNotifications } from "../composables/useNotification";
 import { useSessions } from "../composables/useSession";
+import { useNotificationToast } from "../composables/useNotificationToast";
 
 // Components
 import DashboardHeader from "../components/DashboardHeader.vue";
@@ -14,6 +15,7 @@ import ProgressCard from "../components/ProgressCard.vue";
 import QuickActions from "../components/QuickActions.vue";
 import NotificationsList from "../components/NotificationsList.vue";
 import RecentSessions from "../components/RecentSessions.vue";
+import ToastNotification from "../components/ToastNotification.vue";
 
 const router = useRouter();
 
@@ -40,10 +42,13 @@ const {
   sessions,
   isLoadingSessions,
   isStartingSession,
-  error: sessionError,
   fetchSessions,
   startSession,
 } = useSessions(userId, userType, userIdentifier);
+
+// State untuk notifikasi toast
+const toastNotifications = ref([]); // Menyimpan notifikasi toast
+const { show: showToast } = useNotificationToast(); // Mengambil fungsi untuk menampilkan toast
 
 // Dashboard data (could be moved to composable if needed)
 const progressData = ref({
@@ -87,7 +92,7 @@ const handleNewSession = async () => {
   // Jika mahasiswa, check thesis_id dulu
   if (!userThesisId.value) {
     console.error("Thesis ID not found");
-    alert("Thesis ID tidak ditemukan. Silakan hubungi admin.");
+    showToast("Thesis ID tidak ditemukan. Silakan hubungi admin.", "error");
     return;
   }
 
@@ -97,17 +102,17 @@ const handleNewSession = async () => {
 
     if (sessionData && sessionData.id) {
       // Redirect ke waiting room dengan session_id
+      showToast("Sesi baru telah dimulai!", "success"); // Notifikasi saat sesi dimulai
       router.push(`/waiting-room/${sessionData.id}`);
     } else {
       throw new Error("Session ID tidak ditemukan dalam response");
     }
   } catch (error: any) {
     console.error("Failed to start session:", error);
-    const errorMessage =
-      sessionError.value ||
-      error.message ||
-      "Gagal memulai sesi bimbingan. Silakan coba lagi.";
-    alert(errorMessage);
+    showToast(
+      error.message || "Gagal memulai sesi bimbingan. Silakan coba lagi.",
+      "error"
+    ); // Notifikasi kesalahan
   }
 };
 
@@ -126,6 +131,9 @@ onMounted(async () => {
 
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Toast Notifications -->
+    <ToastNotification :toasts="toastNotifications" />
+
     <!-- Header -->
     <DashboardHeader
       :user-name="userName"
