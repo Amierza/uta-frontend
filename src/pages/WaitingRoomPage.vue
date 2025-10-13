@@ -132,13 +132,6 @@ const copySessionId = () => {
   showToast("Session ID berhasil disalin!", "success", 3000);
 };
 
-// Format elapsed time
-// const formatTime = (seconds: number) => {
-//   const mins = Math.floor(seconds / 60);
-//   const secs = seconds % 60;
-//   return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-// };
-
 onMounted(() => {
   if (!sessionId.value) {
     error.value = "Session ID tidak ditemukan";
@@ -300,54 +293,59 @@ onUnmounted(() => {
               Informasi Sesi
             </h3>
 
-            <div class="space-y-3">
-              <div class="flex items-start justify-between">
-                <span class="text-sm text-gray-600">Session ID</span>
-                <div class="flex flex-col items-end space-y-2">
-                  <code
-                    class="text-sm font-mono bg-white px-3 py-1.5 rounded-lg border border-gray-200 break-all max-w-xs text-right"
+            <div class="space-y-4">
+              <!-- Session ID Section -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="text-sm font-medium text-gray-600"
+                    >Session ID</span
                   >
-                    {{ sessionId }}
-                  </code>
                 </div>
-              </div>
-              <div class="flex items-center mt-3">
+                <code
+                  class="block text-sm font-mono bg-white px-4 py-2.5 rounded-lg border border-gray-200 text-gray-900 break-all w-full"
+                >
+                  {{ sessionId }}
+                </code>
                 <button
                   @click="copySessionId"
-                  class="px-3 py-1.5 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors text-xs font-medium"
+                  class="w-full px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 rounded-lg transition-colors text-sm font-medium"
                 >
-                  Salin Session ID
+                  📋 Salin Session ID
                 </button>
               </div>
-              <!-- Display Session Info -->
+
+              <!-- Thesis Title -->
               <div
-                class="flex items-center justify-between pt-3 border-t border-gray-200"
+                v-if="session"
+                class="pt-4 border-t border-gray-200 space-y-2"
               >
-                <span class="text-sm text-gray-600">Judul Skripsi</span>
-                <p class="text-sm text-gray-900 font-medium" v-if="session">
+                <span class="text-sm font-medium text-gray-600 block"
+                  >Judul Skripsi</span
+                >
+                <p class="text-sm text-gray-900 leading-relaxed">
                   {{ session.thesis.title }}
                 </p>
               </div>
             </div>
-
-            <!-- Actions -->
-            <div class="flex space-x-3">
-              <button
-                @click="handleCancel"
-                class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
-              >
-                Batalkan
-              </button>
-            </div>
           </div>
-        </div>
 
-        <!-- Tips -->
-        <div class="mt-6 text-center">
-          <p class="text-sm text-gray-600">
-            💡 <span class="font-medium">Tips:</span> Pastikan dosen pembimbing
-            memiliki Session ID untuk bergabung
-          </p>
+          <!-- Tips -->
+          <div class="bg-blue-50 rounded-xl p-4 mb-6">
+            <p class="text-sm text-blue-900 text-center">
+              💡 <span class="font-medium">Tips:</span> Pastikan dosen
+              pembimbing memiliki Session ID untuk bergabung
+            </p>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex space-x-3">
+            <button
+              @click="handleCancel"
+              class="flex-1 px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+            >
+              Batalkan
+            </button>
+          </div>
         </div>
       </div>
     </div>
