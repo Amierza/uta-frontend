@@ -85,13 +85,6 @@ const handleSessionClick = (sessionId: string) => {
 };
 
 const handleNewSession = async () => {
-  // Jika dosen, langsung ke chat biasa
-  if (userType.value === "dosen") {
-    router.push("/chat");
-    return;
-  }
-
-  // Jika mahasiswa, check thesis_id dulu
   if (!userThesisId.value) {
     console.error("Thesis ID not found");
     showToast("Thesis ID tidak ditemukan. Silakan hubungi admin.", "error");
