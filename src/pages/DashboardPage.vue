@@ -119,7 +119,10 @@ const handleNewSession = async () => {
 };
 
 // Setup WebSocket listeners
+let isWebSocketInitialized = false;
 const setupWebSocketListeners = () => {
+  if (isWebSocketInitialized) return; // ✅ mencegah listener ganda
+  isWebSocketInitialized = true;
   on("session_started", (data: any) => {
     if (data.thesis_id && data.student_name) {
       showToast(`${data.student_name} telah membuat sesi baru.`, "info");
