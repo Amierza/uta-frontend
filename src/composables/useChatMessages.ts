@@ -68,10 +68,10 @@ export const useChatMessages = (
 
           // PERBAIKAN: Pastikan sender object dibuat dengan benar
           const sender: CustomUserResponse = {
-            id: msg.sender_id || msg.sender?.id || "",
-            name: msg.sender_name || msg.sender?.name || "Unknown",
-            identifier: msg.sender_identifier || msg.sender?.identifier || "",
-            role: msg.sender_role || msg.sender?.role || "student",
+            id: msg.sender.id || "",
+            name: msg.sender.name || "Unknown",
+            identifier: msg.sender.identifier || "",
+            role: msg.sender.role || "student",
           };
 
           console.log("✅ Created sender object:", sender);
