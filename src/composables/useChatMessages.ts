@@ -96,22 +96,29 @@ export const useChatMessages = (
     const messageText = newMessage.value.trim();
     const parentId = replyingTo.value?.id;
 
-    // Create temporary sender object
+    // Get current user's actual name from getSenderNameFn
+    const currentUserName = getSenderNameFn({
+      sender: {
+        id: userId.value,
+        name: "",
+        identifier: "",
+        role: userType.value === "mahasiswa" ? "student" : "lecturer",
+      },
+    });
+
+    console.log("📤 Sending message:", {
+      userId: userId.value,
+      userType: userType.value,
+      senderName: currentUserName,
+    });
+
+    // Create temporary sender object with proper data
     const tempSender: CustomUserResponse = {
       id: userId.value,
-      name: getSenderNameFn({
-        sender: {
-          id: userId.value,
-          name: "",
-          identifier: "",
-          role: userType.value === "mahasiswa" ? "student" : "lecturer",
-        },
-      }),
+      name: currentUserName,
       identifier: "",
       role: userType.value === "mahasiswa" ? "student" : "lecturer",
     };
-
-    console.log("📤 Sending message with sender:", tempSender);
 
     const tempMessage: Message = {
       id: `temp-${Date.now()}`,

@@ -73,18 +73,29 @@ export const useChatParticipants = (
   });
 
   const getSenderName = (
-    message: Message | { sender: CustomUserResponse }
+    message: Message | { sender: CustomUserResponse } | null | undefined
   ): string => {
-    if (!message || !message.sender) return "Unknown";
+    if (!message || !("sender" in message) || !message.sender) {
+      console.warn("⚠️ getSenderName: Invalid message object", message);
+      return "Unknown";
+    }
+
+    console.log("🔍 getSenderName called for:", {
+      sender_id: message.sender.id,
+      sender_name: message.sender.name,
+      has_senderMap: senderMap.value.has(message.sender.id),
+    });
 
     // Get from sender object directly
-    if (message.sender.name) {
+    if (message.sender.name && message.sender.name !== "Unknown") {
+      console.log("✅ Using sender.name:", message.sender.name);
       return message.sender.name;
     }
 
     // Fallback to sender map
     const senderFromMap = senderMap.value.get(message.sender.id);
     if (senderFromMap) {
+      console.log("✅ Using senderMap:", senderFromMap);
       return senderFromMap;
     }
 
@@ -92,6 +103,7 @@ export const useChatParticipants = (
     if (sessionDetail.value?.thesis) {
       const student = sessionDetail.value.thesis.student;
       if (student?.id === message.sender.id) {
+        console.log("✅ Using session student:", student.name);
         return student.name;
       }
 
@@ -99,16 +111,27 @@ export const useChatParticipants = (
         (s: CustomUserResponse) => s.id === message.sender.id
       );
       if (supervisor?.name) {
+        console.log("✅ Using session supervisor:", supervisor.name);
         return supervisor.name;
       }
     }
 
-    console.warn(`Sender not found for ID: ${message.sender.id}`);
+    console.warn(`❌ Sender not found for ID: ${message.sender.id}`);
+    console.log(
+      "📊 Available senderMap:",
+      Array.from(senderMap.value.entries())
+    );
     return "Unknown";
   };
 
   const isMyMessage = (message: Message): boolean => {
-    return message.sender.id === userId.value;
+    const isMine = message.sender.id === userId.value;
+    console.log("🔍 isMyMessage check:", {
+      message_sender_id: message.sender.id,
+      current_userId: userId.value,
+      isMine,
+    });
+    return isMine;
   };
 
   const addOnlineParticipant = (participantId: string): void => {

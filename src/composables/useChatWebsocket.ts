@@ -23,11 +23,19 @@ export const useChatWebSocket = (
     console.log("Setting up WebSocket listeners for session:", sessionId);
 
     on("new_message", (data: WebSocketEventData) => {
-      console.log("New message event received:", {
+      console.log("🔔 New message event received:", {
         id: data.id,
         sender: data.sender,
+        sender_full: JSON.stringify(data.sender),
         text: data.text?.substring(0, 30),
+        raw_data: data,
       });
+
+      // Pastikan sender ada dan valid
+      if (!data.sender || !data.sender.id) {
+        console.error("❌ Invalid sender data from WebSocket:", data);
+        return;
+      }
 
       const messageData: Message = {
         id: data.id || "",
@@ -36,11 +44,23 @@ export const useChatWebSocket = (
         text: data.text || "",
         file_url: data.file_url || null,
         file_type: data.file_type || null,
-        sender: data.sender,
+        sender: {
+          id: data.sender.id,
+          name: data.sender.name || "Unknown",
+          identifier: data.sender.identifier || "",
+          role: data.sender.role || "student",
+        },
         session_id: data.session_id || "",
         parent_message_id: data.parent_message_id || null,
         timestamp: data.timestamp || new Date().toISOString(),
       };
+
+      console.log("✅ Processed message data:", {
+        id: messageData.id,
+        sender_id: messageData.sender.id,
+        sender_name: messageData.sender.name,
+        text: messageData.text.substring(0, 30),
+      });
 
       addNewMessage(messageData);
     });

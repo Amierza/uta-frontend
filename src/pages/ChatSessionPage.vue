@@ -159,7 +159,11 @@ onMounted(async () => {
 
   try {
     await fetchUserProfile();
-    console.log("User profile loaded, userId:", userId.value);
+    console.log("✅ User profile loaded:", {
+      userId: userId.value,
+      userType: userType.value,
+      userIdentifier: userIdentifier.value,
+    });
   } catch (error) {
     console.error("Failed to load user profile:", error);
     toastWrapper("Gagal memuat data pengguna.", "error");
@@ -180,7 +184,10 @@ onMounted(async () => {
 
   try {
     await fetchSessionDetail(sessionId);
-    console.log("Session detail loaded");
+    console.log("✅ Session detail loaded:", {
+      student: sessionDetail.value?.thesis?.student,
+      supervisors: sessionDetail.value?.thesis?.supervisors,
+    });
   } catch (error) {
     console.error("Failed to load session detail:", error);
     toastWrapper("Gagal memuat detail sesi.", "error");
@@ -188,7 +195,7 @@ onMounted(async () => {
   }
 
   await fetchMessages();
-  console.log("Messages loaded");
+  console.log("✅ Messages loaded:", messages.value.length);
 
   setupWebSocketListeners();
   scrollToBottom();
