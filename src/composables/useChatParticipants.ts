@@ -11,58 +11,54 @@ export const useChatParticipants = (
 
   const senderMap = computed<Map<string, string>>(() => {
     if (!sessionDetail.value) {
-      console.log("⚠️ senderMap: sessionDetail is null");
+      console.warn("⚠️ SessionDetail is null, senderMap will be empty");
       return new Map<string, string>();
     }
 
     const map = new Map<string, string>();
 
     try {
+      // Add student to map
       if (sessionDetail.value.thesis?.student) {
         const student = sessionDetail.value.thesis.student;
         map.set(student.id, student.name);
         console.log(
-          "📝 Added student to senderMap:",
-          student.id,
-          "->",
-          student.name
+          `✅ Added student to senderMap: ${student.id} → ${student.name}`
         );
       }
 
+      // Add supervisors to map
       if (sessionDetail.value.thesis?.supervisors) {
         sessionDetail.value.thesis.supervisors.forEach(
           (supervisor: CustomUserResponse) => {
             map.set(supervisor.id, supervisor.name);
             console.log(
-              "📝 Added supervisor to senderMap:",
-              supervisor.id,
-              "->",
-              supervisor.name
+              `✅ Added supervisor to senderMap: ${supervisor.id} → ${supervisor.name}`
             );
           }
         );
       }
 
-      console.log("✅ senderMap built with", map.size, "entries");
+      console.log("📊 SenderMap built with", map.size, "entries");
     } catch (error) {
-      console.error("Error building sender map:", error);
+      console.error("❌ Error building sender map:", error);
     }
 
     return map;
   });
 
-  // Watch for sessionDetail changes
+  // Watch for sessionDetail changes to debug
   watch(
     sessionDetail,
     (newVal) => {
       if (newVal) {
-        console.log("📊 SessionDetail updated:", {
-          student: newVal.thesis?.student?.name,
-          supervisors: newVal.thesis?.supervisors?.map((s) => s.name),
+        console.log("🔄 SessionDetail changed:", {
+          hasStudent: !!newVal.thesis?.student,
+          supervisorCount: newVal.thesis?.supervisors?.length || 0,
         });
       }
     },
-    { immediate: true, deep: true }
+    { immediate: true }
   );
 
   const allParticipants = computed<Participant[]>(() => {
@@ -112,80 +108,82 @@ export const useChatParticipants = (
     }
 
     const senderId = message.sender.id;
-    const senderNameFromObject = message.sender.name;
+    const senderName = message.sender.name;
 
-    // Priority 1: Use name from message sender object if valid
-    if (
-      senderNameFromObject &&
-      senderNameFromObject !== "Unknown" &&
-      senderNameFromObject !== "" &&
-      senderNameFromObject !== "Loading..."
-    ) {
-      return senderNameFromObject;
+    console.log("🔍 getSenderName lookup:", {
+      sender_id: senderId,
+      sender_name_in_message: senderName,
+      senderMap_size: senderMap.value.size,
+      in_senderMap: senderMap.value.has(senderId),
+    });
+
+    // Priority 1: Use sender.name from message if available and not "Unknown"
+    if (senderName && senderName !== "Unknown") {
+      console.log("✅ Using sender.name from message:", senderName);
+      return senderName;
     }
 
-    // Priority 2: Get from senderMap (from sessionDetail)
-    const senderFromMap = senderMap.value.get(senderId);
-    if (senderFromMap) {
-      console.log("✅ Using senderMap for", senderId, "->", senderFromMap);
-      return senderFromMap;
+    // Priority 2: Look up in senderMap
+    const nameFromMap = senderMap.value.get(senderId);
+    if (nameFromMap) {
+      console.log("✅ Found in senderMap:", nameFromMap);
+      return nameFromMap;
     }
 
-    // Priority 3: Fallback to sessionDetail direct lookup
-    if (!sessionDetail.value?.thesis) {
-      console.warn("⚠️ sessionDetail.thesis not available");
-      return "Loading...";
-    }
+    // Priority 3: Search in sessionDetail
+    if (sessionDetail.value?.thesis) {
+      const student = sessionDetail.value.thesis.student;
+      if (student?.id === senderId) {
+        console.log("✅ Found as student:", student.name);
+        return student.name;
+      }
 
-    // Check student
-    const student = sessionDetail.value.thesis.student;
-    if (student?.id === senderId) {
-      return student.name;
-    }
-
-    // Check supervisors
-    const supervisors = sessionDetail.value.thesis.supervisors;
-    if (supervisors) {
-      const supervisor = supervisors.find(
+      const supervisor = sessionDetail.value.thesis.supervisors?.find(
         (s: CustomUserResponse) => s.id === senderId
       );
       if (supervisor?.name) {
+        console.log("✅ Found as supervisor:", supervisor.name);
         return supervisor.name;
       }
     }
 
-    // Priority 4: Generic fallback by role
-    if (message.sender.role === "student") {
-      return student?.name || "Mahasiswa";
-    }
-
-    if (
-      message.sender.role === "lecturer" ||
-      message.sender.role === "supervisor"
-    ) {
-      return "Dosen";
-    }
-
-    console.error(`❌ Sender not found for ID: ${senderId}`);
-    console.log("📊 senderMap:", Array.from(senderMap.value.entries()));
+    console.error("❌ Sender not found:", {
+      sender_id: senderId,
+      available_in_map: Array.from(senderMap.value.entries()),
+      sessionDetail_loaded: !!sessionDetail.value,
+    });
 
     return "Unknown";
   };
 
   const isMyMessage = (message: Message): boolean => {
-    return message.sender.id === userId.value;
+    const isMine = message.sender.id === userId.value;
+
+    if (!isMine) {
+      console.log("🔍 isMyMessage check:", {
+        message_sender_id: message.sender.id,
+        message_sender_name: message.sender.name,
+        current_userId: userId.value,
+        isMine: false,
+      });
+    }
+
+    return isMine;
   };
 
   const addOnlineParticipant = (participantId: string): void => {
     onlineParticipants.value.add(participantId);
+    console.log("✅ Participant online:", participantId);
   };
 
   const removeOnlineParticipant = (participantId: string): void => {
     onlineParticipants.value.delete(participantId);
+    console.log("⚠️ Participant offline:", participantId);
   };
 
   const clearOnlineParticipants = (): void => {
     onlineParticipants.value.clear();
+    console.log("🧹 Cleared all online participants");
   };
 
   return {

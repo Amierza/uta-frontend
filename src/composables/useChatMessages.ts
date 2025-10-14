@@ -26,13 +26,7 @@ export const useChatMessages = (
   const groupedMessages = computed<GroupedMessages>(() => {
     const groups: GroupedMessages = {};
 
-    // Sort messages first by timestamp
-    const sortedMessages = [...messages.value].sort(
-      (a, b) =>
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-    );
-
-    sortedMessages.forEach((msg) => {
+    messages.value.forEach((msg) => {
       const dateKey = formatDate(msg.timestamp);
       if (!groups[dateKey]) {
         groups[dateKey] = [];
@@ -54,19 +48,27 @@ export const useChatMessages = (
   const fetchMessages = async (): Promise<void> => {
     try {
       isLoadingMessages.value = true;
+      console.log("📥 Fetching messages for session:", sessionId);
+
       const response = await getMessages(sessionId);
 
       if (response.status && Array.isArray(response.data)) {
-        console.log("📥 Raw messages from API:", response.data.length);
+        console.log("📦 Raw messages from API:", response.data.length);
 
         const messagesData = response.data.map((msg: any) => {
-          // Create message object with proper sender data
-          const messageObj: Message = {
+          console.log("🔄 Mapping message:", {
+            id: msg.id,
+            sender_id: msg.sender_id,
+            sender_name: msg.sender_name,
+            text: msg.text?.substring(0, 30),
+          });
+
+          return {
             id: msg.id,
             session_id: msg.session_id || sessionId,
             sender: {
               id: msg.sender_id,
-              name: msg.sender_name || "", // Keep original name from backend
+              name: msg.sender_name || "Unknown",
               identifier: msg.sender_identifier || "",
               role: msg.sender_role || "student",
             },
@@ -78,38 +80,41 @@ export const useChatMessages = (
             timestamp: msg.timestamp || new Date().toISOString(),
             is_sending: false,
           };
-
-          console.log("📝 Mapped message:", {
-            id: messageObj.id,
-            sender_id: messageObj.sender.id,
-            sender_name: messageObj.sender.name,
-            timestamp: messageObj.timestamp,
-          });
-
-          return messageObj;
         });
 
-        // Sort by timestamp ascending (oldest first)
+        // Sort messages by timestamp
         messages.value = messagesData.sort(
           (a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
         );
 
         console.log("✅ Messages loaded and sorted:", messages.value.length);
-        console.log("First message:", messages.value[0]?.text);
-        console.log(
-          "Last message:",
-          messages.value[messages.value.length - 1]?.text
-        );
 
-        scrollToBottom();
+        // Debug: Log first and last message
+        if (messages.value.length > 0) {
+          console.log("📝 First message:", {
+            id: messages.value[0].id,
+            sender: messages.value[0].sender.name,
+            timestamp: messages.value[0].timestamp,
+          });
+          console.log("📝 Last message:", {
+            id: messages.value[messages.value.length - 1].id,
+            sender: messages.value[messages.value.length - 1].sender.name,
+            timestamp: messages.value[messages.value.length - 1].timestamp,
+          });
+        }
+
+        // Scroll after render
+        nextTick(() => {
+          scrollToBottom();
+        });
       } else {
         console.error("❌ Invalid response format:", response);
         throw new Error("Failed to load messages");
       }
     } catch (error) {
       console.error("❌ Error fetching messages:", error);
-      showToast("Gagal memuat pesan. Silakan refresh halaman.", "error");
+      showToast("Gagal memuat pesan", "error");
     } finally {
       isLoadingMessages.value = false;
     }
@@ -121,23 +126,19 @@ export const useChatMessages = (
     const messageText = newMessage.value.trim();
     const parentId = replyingTo.value?.id;
 
-    // Get current user's actual name
-    const currentUserName = userName.value || "You";
-
-    console.log("📤 Sending message:", {
-      userId: userId.value,
-      userName: currentUserName,
-      userType: userType.value,
-      text: messageText.substring(0, 30),
-    });
-
-    // Create temporary sender object
+    // Create temp sender with current user data
     const tempSender: CustomUserResponse = {
       id: userId.value,
-      name: currentUserName,
+      name: userName.value,
       identifier: userIdentifier.value,
       role: userType.value === "mahasiswa" ? "student" : "lecturer",
     };
+
+    console.log("📤 Sending message:", {
+      userId: userId.value,
+      userName: userName.value,
+      userType: userType.value,
+    });
 
     const tempMessage: Message = {
       id: `temp-${Date.now()}`,
@@ -179,9 +180,10 @@ export const useChatMessages = (
         messages.value.splice(tempIndex, 1);
       }
 
+      console.log("✅ Message sent successfully");
       scrollToBottom();
     } catch (error: any) {
-      console.error("Failed to send message:", error);
+      console.error("❌ Failed to send message:", error);
 
       // Remove temporary message on failure
       const tempIndex = messages.value.findIndex(
@@ -203,14 +205,22 @@ export const useChatMessages = (
   };
 
   const addNewMessage = (data: Message): void => {
+    console.log("📨 Adding new message from WebSocket:", {
+      id: data.id,
+      sender_id: data.sender.id,
+      sender_name: data.sender.name,
+      text: data.text?.substring(0, 30),
+    });
+
     if (data.session_id !== sessionId) {
-      console.warn("⚠️ Message dari session berbeda, ignoring");
+      console.warn("⚠️ Message from different session, ignoring");
       return;
     }
 
+    // Check if message already exists
     const exists = messages.value.some((m) => m.id === data.id);
     if (exists) {
-      console.log("⏭️ Message sudah ada, skipping");
+      console.log("ℹ️ Message already exists, skipping");
       return;
     }
 
@@ -219,25 +229,22 @@ export const useChatMessages = (
       (m) =>
         m.is_sending && m.text === data.text && m.sender.id === data.sender.id
     );
+
     if (tempIndex !== -1) {
       console.log("🔄 Replacing temp message with real message");
       messages.value.splice(tempIndex, 1);
     }
 
-    console.log("➕ Adding new message:", {
-      id: data.id,
-      sender: data.sender.name,
-      text: data.text.substring(0, 30),
-    });
-
+    // Add new message
     messages.value.push(data);
 
-    // Re-sort after adding
+    // Re-sort by timestamp to maintain order
     messages.value.sort(
       (a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
+    console.log("✅ Message added, total:", messages.value.length);
     scrollToBottom();
   };
 
