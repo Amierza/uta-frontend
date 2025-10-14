@@ -10,10 +10,10 @@ export const sendMessage = async (
 ): Promise<SuccessResponse<MessageResponse> | ErrorResponse> => {
   const token = localStorage.getItem("access_token");
   const response = await api.post(`/sessions/${sessionId}/messages`, {
+    payload,
     headers: {
       Authorization: `Bearer ${token}`,
     },
-    payload,
   });
   return response.data;
 };
@@ -25,7 +25,7 @@ export const getMessages = async (
   const token = localStorage.getItem("access_token");
   const response = await api.get(`/sessions/${sessionId}/messages`, {
     headers: {
-      Authorization: `Berare ${token}`,
+      Authorization: `Bearer ${token}`,
     },
   });
   return response.data;
