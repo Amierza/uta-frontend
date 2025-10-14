@@ -13,8 +13,8 @@ export const useChatMessages = (
   userName: Ref<string>,
   userIdentifier: Ref<string>,
   userType: Ref<string>,
-  showToast: (message: string, type?: ToastType, duration?: number) => void,
-  getSenderNameFn: (message: Message | { sender: CustomUserResponse }) => string
+  showToast: (message: string, type?: ToastType, duration?: number) => void
+  // getSenderNameFn: (message: Message | { sender: CustomUserResponse }) => string
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -26,7 +26,13 @@ export const useChatMessages = (
   const groupedMessages = computed<GroupedMessages>(() => {
     const groups: GroupedMessages = {};
 
-    messages.value.forEach((msg) => {
+    // Sort messages first by timestamp
+    const sortedMessages = [...messages.value].sort(
+      (a, b) =>
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+
+    sortedMessages.forEach((msg) => {
       const dateKey = formatDate(msg.timestamp);
       if (!groups[dateKey]) {
         groups[dateKey] = [];
@@ -48,37 +54,62 @@ export const useChatMessages = (
   const fetchMessages = async (): Promise<void> => {
     try {
       isLoadingMessages.value = true;
-      const response = await getMessages(sessionId); // Panggilan ke API
+      const response = await getMessages(sessionId);
 
       if (response.status && Array.isArray(response.data)) {
-        const messagesData = response.data.map((msg: any) => ({
-          id: msg.id,
-          session_id: msg.session_id || sessionId, // Sesuaikan dengan yang diharapkan
-          sender: {
-            id: msg.sender_id,
-            name: msg.sender_name || "Unknown", // Tambahkan fallback
-            identifier: msg.sender_identifier || "",
-            role: msg.sender_role || "student", // Tambahkan fallback
-          },
-          is_text: msg.is_text,
-          text: msg.text,
-          file_url: msg.file_url || null,
-          file_type: msg.file_type || null,
-          parent_message_id: msg.parent_message_id || null,
-          timestamp: msg.timestamp || new Date().toISOString(),
-          is_sending: false, // Tambahkan properti ini jika perlu
-        }));
+        console.log("📥 Raw messages from API:", response.data.length);
 
+        const messagesData = response.data.map((msg: any) => {
+          // Create message object with proper sender data
+          const messageObj: Message = {
+            id: msg.id,
+            session_id: msg.session_id || sessionId,
+            sender: {
+              id: msg.sender_id,
+              name: msg.sender_name || "", // Keep original name from backend
+              identifier: msg.sender_identifier || "",
+              role: msg.sender_role || "student",
+            },
+            is_text: msg.is_text,
+            text: msg.text,
+            file_url: msg.file_url || null,
+            file_type: msg.file_type || null,
+            parent_message_id: msg.parent_message_id || null,
+            timestamp: msg.timestamp || new Date().toISOString(),
+            is_sending: false,
+          };
+
+          console.log("📝 Mapped message:", {
+            id: messageObj.id,
+            sender_id: messageObj.sender.id,
+            sender_name: messageObj.sender.name,
+            timestamp: messageObj.timestamp,
+          });
+
+          return messageObj;
+        });
+
+        // Sort by timestamp ascending (oldest first)
         messages.value = messagesData.sort(
           (a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        ); // Urutkan berdasarkan timestamp
-        console.log("Messages loaded:", messages.value.length);
+        );
+
+        console.log("✅ Messages loaded and sorted:", messages.value.length);
+        console.log("First message:", messages.value[0]?.text);
+        console.log(
+          "Last message:",
+          messages.value[messages.value.length - 1]?.text
+        );
+
+        scrollToBottom();
       } else {
+        console.error("❌ Invalid response format:", response);
         throw new Error("Failed to load messages");
       }
     } catch (error) {
-      console.error("Error fetching messages:", error);
+      console.error("❌ Error fetching messages:", error);
+      showToast("Gagal memuat pesan. Silakan refresh halaman.", "error");
     } finally {
       isLoadingMessages.value = false;
     }
@@ -90,27 +121,21 @@ export const useChatMessages = (
     const messageText = newMessage.value.trim();
     const parentId = replyingTo.value?.id;
 
-    // Get current user's actual name from getSenderNameFn
-    const currentUserName = getSenderNameFn({
-      sender: {
-        id: userId.value,
-        name: userName.value,
-        identifier: userIdentifier.value,
-        role: userType.value === "mahasiswa" ? "student" : "lecturer",
-      },
-    });
+    // Get current user's actual name
+    const currentUserName = userName.value || "You";
 
     console.log("📤 Sending message:", {
       userId: userId.value,
+      userName: currentUserName,
       userType: userType.value,
-      senderName: currentUserName,
+      text: messageText.substring(0, 30),
     });
 
-    // Create temporary sender object with proper data
+    // Create temporary sender object
     const tempSender: CustomUserResponse = {
       id: userId.value,
       name: currentUserName,
-      identifier: "",
+      identifier: userIdentifier.value,
       role: userType.value === "mahasiswa" ? "student" : "lecturer",
     };
 
@@ -179,13 +204,13 @@ export const useChatMessages = (
 
   const addNewMessage = (data: Message): void => {
     if (data.session_id !== sessionId) {
-      console.warn("Message dari session berbeda, ignoring");
+      console.warn("⚠️ Message dari session berbeda, ignoring");
       return;
     }
 
     const exists = messages.value.some((m) => m.id === data.id);
     if (exists) {
-      console.log("Message sudah ada, skipping");
+      console.log("⏭️ Message sudah ada, skipping");
       return;
     }
 
@@ -199,7 +224,15 @@ export const useChatMessages = (
       messages.value.splice(tempIndex, 1);
     }
 
+    console.log("➕ Adding new message:", {
+      id: data.id,
+      sender: data.sender.name,
+      text: data.text.substring(0, 30),
+    });
+
     messages.value.push(data);
+
+    // Re-sort after adding
     messages.value.sort(
       (a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
