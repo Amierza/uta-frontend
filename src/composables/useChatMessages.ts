@@ -14,7 +14,6 @@ export const useChatMessages = (
   userIdentifier: Ref<string>,
   userType: Ref<string>,
   showToast: (message: string, type?: ToastType, duration?: number) => void
-  // getSenderNameFn: (message: Message | { sender: CustomUserResponse }) => string
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -54,6 +53,10 @@ export const useChatMessages = (
 
       if (response.status && Array.isArray(response.data)) {
         console.log("📦 Raw messages from API:", response.data.length);
+        console.log(
+          "📦 RAW API Response:",
+          JSON.stringify(response.data[0], null, 2)
+        );
 
         const messagesData = response.data.map((msg: any) => {
           console.log("🔄 Mapping message:", {
@@ -63,17 +66,22 @@ export const useChatMessages = (
             text: msg.text?.substring(0, 30),
           });
 
+          // PERBAIKAN: Pastikan sender object dibuat dengan benar
+          const sender: CustomUserResponse = {
+            id: msg.sender_id || msg.sender?.id || "",
+            name: msg.sender_name || msg.sender?.name || "Unknown",
+            identifier: msg.sender_identifier || msg.sender?.identifier || "",
+            role: msg.sender_role || msg.sender?.role || "student",
+          };
+
+          console.log("✅ Created sender object:", sender);
+
           return {
             id: msg.id,
             session_id: msg.session_id || sessionId,
-            sender: {
-              id: msg.sender_id,
-              name: msg.sender_name || "Unknown",
-              identifier: msg.sender_identifier || "",
-              role: msg.sender_role || "student",
-            },
+            sender: sender,
             is_text: msg.is_text,
-            text: msg.text,
+            text: msg.text || "",
             file_url: msg.file_url || null,
             file_type: msg.file_type || null,
             parent_message_id: msg.parent_message_id || null,
@@ -90,17 +98,18 @@ export const useChatMessages = (
 
         console.log("✅ Messages loaded and sorted:", messages.value.length);
 
-        // Debug: Log first and last message
+        // Debug: Log sender information
         if (messages.value.length > 0) {
-          console.log("📝 First message:", {
-            id: messages.value[0].id,
-            sender: messages.value[0].sender.name,
-            timestamp: messages.value[0].timestamp,
+          console.log("📝 First message sender:", {
+            id: messages.value[0].sender.id,
+            name: messages.value[0].sender.name,
+            identifier: messages.value[0].sender.identifier,
           });
-          console.log("📝 Last message:", {
-            id: messages.value[messages.value.length - 1].id,
-            sender: messages.value[messages.value.length - 1].sender.name,
-            timestamp: messages.value[messages.value.length - 1].timestamp,
+          console.log("📝 Last message sender:", {
+            id: messages.value[messages.value.length - 1].sender.id,
+            name: messages.value[messages.value.length - 1].sender.name,
+            identifier:
+              messages.value[messages.value.length - 1].sender.identifier,
           });
         }
 
