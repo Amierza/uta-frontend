@@ -32,7 +32,7 @@ const routes = [
     },
   },
   {
-    path: "/sessions/:session_id",
+    path: "/session/:session_id",
     name: "ChattingSession",
     component: ChatSessionPage,
     meta: {
