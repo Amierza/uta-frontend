@@ -1,4 +1,3 @@
-// composables/useChatParticipants.ts
 import { ref, computed, type Ref } from "vue";
 import type { Participant, Message } from "../types/message";
 import type { SessionResponse } from "../types/session";
@@ -9,6 +8,7 @@ export const useChatParticipants = (
   userId: Ref<string>
 ) => {
   const onlineParticipants = ref<Set<string>>(new Set());
+
   const senderMap = computed<Map<string, string>>(() => {
     if (!sessionDetail.value) return new Map<string, string>();
 
@@ -58,10 +58,7 @@ export const useChatParticipants = (
             id: s.id,
             name: s.name,
             identifier: s.identifier,
-            role: s.role as
-              | "student"
-              | "primary_supervisor"
-              | "secondary_supervisor",
+            role: s.role as "primary_supervisor" | "secondary_supervisor",
             online: onlineParticipants.value.has(s.id),
           });
         }
@@ -75,38 +72,43 @@ export const useChatParticipants = (
     return allParticipants.value.filter((p) => p.id !== userId.value);
   });
 
-  const getSenderName = (message: Message | Record<string, any>): string => {
-    if (!message || !message.sender_id) return "Unknown";
+  const getSenderName = (
+    message: Message | { sender: CustomUserResponse }
+  ): string => {
+    if (!message || !message.sender) return "Unknown";
 
-    const senderFromMap = senderMap.value.get(message.sender_id);
+    // Get from sender object directly
+    if (message.sender.name) {
+      return message.sender.name;
+    }
+
+    // Fallback to sender map
+    const senderFromMap = senderMap.value.get(message.sender.id);
     if (senderFromMap) {
       return senderFromMap;
     }
 
-    if (message.sender_name) {
-      return message.sender_name;
-    }
-
+    // Fallback to session detail
     if (sessionDetail.value?.thesis) {
       const student = sessionDetail.value.thesis.student;
-      if (student?.id === message.sender_id) {
+      if (student?.id === message.sender.id) {
         return student.name;
       }
 
       const supervisor = sessionDetail.value.thesis.supervisors?.find(
-        (s: CustomUserResponse) => s.id === message.sender_id
+        (s: CustomUserResponse) => s.id === message.sender.id
       );
       if (supervisor?.name) {
         return supervisor.name;
       }
     }
 
-    console.warn(`Sender not found for ID: ${message.sender_id}`);
+    console.warn(`Sender not found for ID: ${message.sender.id}`);
     return "Unknown";
   };
 
   const isMyMessage = (message: Message): boolean => {
-    return message.sender_id === userId.value;
+    return message.sender.id === userId.value;
   };
 
   const addOnlineParticipant = (participantId: string): void => {

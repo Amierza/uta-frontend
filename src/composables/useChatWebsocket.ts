@@ -1,4 +1,3 @@
-// composables/useChatWebSocket.ts
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 import type { Message, WebSocketEventData } from "../types/message";
@@ -26,7 +25,7 @@ export const useChatWebSocket = (
     on("new_message", (data: WebSocketEventData) => {
       console.log("New message event received:", {
         id: data.id,
-        sender_id: data.sender_id,
+        sender: data.sender,
         text: data.text?.substring(0, 30),
       });
 
@@ -37,9 +36,7 @@ export const useChatWebSocket = (
         text: data.text || "",
         file_url: data.file_url || null,
         file_type: data.file_type || null,
-        sender_role: (data.sender_role as "student" | "lecturer") || "student",
-        sender_id: data.sender_id || "",
-        sender_name: data.sender_name,
+        sender: data.sender,
         session_id: data.session_id || "",
         parent_message_id: data.parent_message_id || null,
         timestamp: data.timestamp || new Date().toISOString(),

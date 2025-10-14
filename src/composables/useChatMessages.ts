@@ -1,4 +1,3 @@
-// composables/useChatMessages.ts
 import { ref, computed, nextTick, type Ref } from "vue";
 import { sendMessage, getMessages } from "../api/message";
 import { formatDate } from "../utils";
@@ -6,6 +5,7 @@ import type { Message, GroupedMessages } from "../types/message";
 import type { SendMessageRequest } from "../types/message";
 import type { SuccessResponse } from "../types/api";
 import type { SessionResponse } from "../types/session";
+import type { CustomUserResponse } from "../types/user";
 
 type ToastType = "info" | "success" | "warning" | "error";
 
@@ -14,7 +14,7 @@ export const useChatMessages = (
   userId: Ref<string>,
   userType: Ref<string>,
   showToast: (message: string, type?: ToastType, duration?: number) => void,
-  getSenderNameFn: (message: Message | { sender_id: string }) => string
+  getSenderNameFn: (message: Message | { sender: CustomUserResponse }) => string
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -60,9 +60,12 @@ export const useChatMessages = (
         messages.value = messagesData.map((msg: any) => ({
           id: msg.id,
           session_id: msg.session_id || sessionId,
-          sender_id: msg.sender_id,
-          sender_name: msg.sender_name,
-          sender_role: msg.sender_role,
+          sender: msg.sender || {
+            id: msg.sender_id,
+            name: msg.sender_name,
+            identifier: msg.sender_identifier || "",
+            role: msg.sender_role,
+          },
           is_text: msg.is_text,
           text: msg.text,
           file_url: msg.file_url,
@@ -93,21 +96,27 @@ export const useChatMessages = (
     const messageText = newMessage.value.trim();
     const parentId = replyingTo.value?.id;
 
-    // Gunakan getSenderNameFn untuk mendapatkan nama yang benar
-    const senderName = getSenderNameFn({ sender_id: userId.value });
+    // Create temporary sender object
+    const tempSender: CustomUserResponse = {
+      id: userId.value,
+      name: getSenderNameFn({
+        sender: {
+          id: userId.value,
+          name: "",
+          identifier: "",
+          role: userType.value === "mahasiswa" ? "student" : "lecturer",
+        },
+      }),
+      identifier: "",
+      role: userType.value === "mahasiswa" ? "student" : "lecturer",
+    };
 
-    console.log("📤 Sending message with sender:", {
-      userId: userId.value,
-      senderName,
-      userType: userType.value,
-    });
+    console.log("📤 Sending message with sender:", tempSender);
 
     const tempMessage: Message = {
       id: `temp-${Date.now()}`,
       session_id: sessionId,
-      sender_id: userId.value,
-      sender_name: senderName,
-      sender_role: userType.value === "mahasiswa" ? "student" : "lecturer",
+      sender: tempSender,
       is_text: true,
       text: messageText,
       file_url: null,
@@ -136,7 +145,7 @@ export const useChatMessages = (
 
       await sendMessage(sessionId, payload);
 
-      // Hapus temporary message setelah berhasil
+      // Remove temporary message after success
       const tempIndex = messages.value.findIndex(
         (m) => m.id === tempMessage.id
       );
@@ -148,7 +157,7 @@ export const useChatMessages = (
     } catch (error: any) {
       console.error("Failed to send message:", error);
 
-      // Hapus temporary message jika gagal
+      // Remove temporary message on failure
       const tempIndex = messages.value.findIndex(
         (m) => m.id === tempMessage.id
       );
@@ -179,10 +188,10 @@ export const useChatMessages = (
       return;
     }
 
-    // Hapus temporary message jika ada yang match
+    // Remove temporary message if match found
     const tempIndex = messages.value.findIndex(
       (m) =>
-        m.is_sending && m.text === data.text && m.sender_id === data.sender_id
+        m.is_sending && m.text === data.text && m.sender.id === data.sender.id
     );
     if (tempIndex !== -1) {
       console.log("🔄 Replacing temp message with real message");

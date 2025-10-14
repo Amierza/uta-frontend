@@ -12,6 +12,7 @@ import {
   leaveSession as leaveSessionApi,
   endSession as endSessionApi,
 } from "../api/session";
+import type { Message } from "../types/message";
 
 // Components
 import ChatHeader from "../components/ChatHeader.vue";
@@ -103,6 +104,18 @@ const sessionStatus = computed<string>(() => {
 const replyToSenderName = computed<string>(() => {
   return replyingTo.value ? getSenderName(replyingTo.value) : "";
 });
+
+// Helper functions for message replies
+const getReplyToMessage = (message: Message): Message | null => {
+  if (!message.parent_message_id) return null;
+  return messages.value.find((m) => m.id === message.parent_message_id) || null;
+};
+
+const getReplyToSenderName = (message: Message): string => {
+  if (!message.parent_message_id) return "";
+  const parentMessage = getReplyToMessage(message);
+  return parentMessage ? getSenderName(parentMessage) : "";
+};
 
 // Actions
 const handleLeaveSession = async (): Promise<void> => {
@@ -275,17 +288,8 @@ onUnmounted(() => {
             :message="message"
             :is-my-message="isMyMessage(message)"
             :sender-name="getSenderName(message)"
-            :reply-to-message="
-              messages.find((m) => m.id === message.parent_message_id) || null
-            "
-            :reply-to-sender-name="
-              message.parent_message_id
-                ? getSenderName(
-                    messages.find((m) => m.id === message.parent_message_id) ||
-                      {}
-                  )
-                : ''
-            "
+            :reply-to-message="getReplyToMessage(message)"
+            :reply-to-sender-name="getReplyToSenderName(message)"
             @reply="setReplyTo"
           />
         </div>
