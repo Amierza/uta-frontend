@@ -13,4 +13,5 @@ export interface CustomUserResponse {
   id: string;
   name: string;
   identifier: string;
+  role: string;
 }
