@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted, watch } from "vue";
 import { useRouter } from "vue-router";
 
 // Composables
@@ -16,11 +16,10 @@ import ProgressCard from "../components/ProgressCard.vue";
 import QuickActions from "../components/QuickActions.vue";
 import NotificationsList from "../components/NotificationsList.vue";
 import RecentSessions from "../components/RecentSessions.vue";
-import ToastNotification from "../components/ToastNotification.vue";
 
 const router = useRouter();
 
-// Use composables
+// Composables
 const {
   userId,
   userType,
@@ -31,7 +30,6 @@ const {
   userTotalStudent,
   userStudyProgram,
   userFaculty,
-  isOnline,
   isLoadingProfile,
   fetchUserProfile,
 } = useUser();
@@ -48,12 +46,10 @@ const {
   joinActiveSession,
 } = useSessions(userId, userType, userIdentifier);
 
-// State untuk notifikasi toast
-const toastNotifications = ref([]); // Menyimpan notifikasi toast
-const { show: showToast } = useNotificationToast(); // Mengambil fungsi untuk menampilkan toast
-const { on } = useWebSocket(); // Ambil fungsi dari WebSocket
+const { show: showToast } = useNotificationToast();
+const { connect, on, isConnected } = useWebSocket();
 
-// Dashboard data (could be moved to composable if needed)
+// State
 const progressData = ref({
   mahasiswa: {
     totalMeetings: 12,
@@ -83,10 +79,7 @@ const handleQuickAction = (action: string) => {
 
 const handleSessionClick = async (sessionId: string) => {
   try {
-    // Hit API join session terlebih dahulu
     await joinActiveSession(sessionId);
-
-    // Kalau berhasil, baru redirect
     router.push(`/session/${sessionId}`);
   } catch (error: any) {
     console.error("Failed to join session:", error);
@@ -105,12 +98,10 @@ const handleNewSession = async () => {
   }
 
   try {
-    // Start session dengan thesis_id
     const sessionData = await startSession(userThesisId.value);
 
     if (sessionData && sessionData.id) {
-      // Redirect ke waiting room dengan session_id
-      showToast("Sesi baru telah dibuat!, mohon tunggu...", "info"); // Notifikasi saat sesi dimulai
+      showToast("Sesi baru telah dibuat!", "success");
       router.push(`/waiting-room/${sessionData.id}`);
     } else {
       throw new Error("Session ID tidak ditemukan dalam response");
@@ -120,40 +111,105 @@ const handleNewSession = async () => {
     showToast(
       error.message || "Gagal memulai sesi bimbingan. Silakan coba lagi.",
       "error"
-    ); // Notifikasi kesalahan
+    );
   }
 };
 
-// Setup WebSocket listeners
-let isWebSocketInitialized = false;
+// WebSocket listeners setup
+let webSocketListenersSetup = false;
+
 const setupWebSocketListeners = () => {
-  if (isWebSocketInitialized) return; // ✅ mencegah listener ganda
-  isWebSocketInitialized = true;
+  if (webSocketListenersSetup) {
+    console.log("✅ WebSocket listeners sudah di-setup");
+    return;
+  }
 
+  webSocketListenersSetup = true;
+  console.log("🔌 Setting up WebSocket listeners di Dashboard");
+
+  // Event: Session dimulai oleh mahasiswa
   on("session_started", (data: any) => {
-    if (data.thesis_id && data.student_name) {
-      showToast(`${data.student_name} telah membuat sesi baru.`, "info");
-    } else {
-      const primarySupervisor = data.supervisors.find(
-        (s: any) => s.role === "primary_lecturer"
-      );
-      const secondarySupervisor = data.supervisors.find(
-        (s: any) => s.role === "secondary_lecturer"
-      );
+    console.log("📢 EVENT: session_started", data);
 
-      // Jika pembimbing utama yang mengawali sesi
-      if (primarySupervisor) {
-        showToast(`${primarySupervisor.name} telah membuat sesi baru.`, "info");
-      }
+    // Jika current user adalah dosen dan termasuk supervisor thesis ini
+    if (userType.value === "dosen") {
+      const supervisorIds = data.supervisors?.map((s: any) => s.id) || [];
+      const isSupervisor = supervisorIds.includes(userIdentifier.value);
 
-      // Jika pembimbing sekunder yang mengawali sesi
-      if (secondarySupervisor) {
-        showToast(
-          `${secondarySupervisor.name} telah membuat sesi baru.`,
-          "info"
-        );
+      if (isSupervisor) {
+        console.log("✅ Ini supervisor thesis ini, auto-refresh sessions");
+        // Auto-refresh sessions
+        fetchSessions();
+
+        // Show notification
+        showToast(`${data.student_name} memulai sesi bimbingan`, "info");
       }
     }
+  });
+
+  // Event: Primary lecturer join
+  on("primary_lecturer_joined", (data: any) => {
+    console.log("📢 EVENT: primary_lecturer_joined", data);
+
+    if (userType.value === "dosen") {
+      fetchSessions();
+    }
+
+    if (userType.value === "mahasiswa") {
+      showToast(
+        `${data.supervisors[0]?.name || "Dosen"} telah bergabung`,
+        "info"
+      );
+    }
+  });
+
+  // Event: Secondary lecturer join
+  on("secondary_lecturer_joined", (data: any) => {
+    console.log("📢 EVENT: secondary_lecturer_joined", data);
+
+    if (userType.value === "dosen") {
+      fetchSessions();
+    }
+
+    if (userType.value === "mahasiswa") {
+      showToast(
+        `${data.supervisors[1]?.name || "Dosen"} telah bergabung`,
+        "info"
+      );
+    }
+  });
+
+  // Event: Student join
+  on("student_joined", (data: any) => {
+    console.log("📢 EVENT: student_joined", data);
+
+    if (userType.value === "dosen") {
+      fetchSessions();
+      showToast(`${data.student_name} bergabung ke sesi`, "info");
+    }
+  });
+
+  // Event: Session ended
+  on("user_ended", (data: any) => {
+    console.log("📢 EVENT: user_ended", data);
+    fetchSessions();
+    showToast("Sesi telah berakhir", "info");
+  });
+
+  // Event: Someone left
+  on("primary_lecturer_leaved", (data: any) => {
+    console.log("📢 EVENT: primary_lecturer_leaved", data);
+    fetchSessions();
+  });
+
+  on("secondary_lecturer_leaved", (data: any) => {
+    console.log("📢 EVENT: secondary_lecturer_leaved", data);
+    fetchSessions();
+  });
+
+  on("student_leaved", (data: any) => {
+    console.log("📢 EVENT: student_leaved", data);
+    fetchSessions();
   });
 };
 
@@ -162,25 +218,52 @@ const logout = () => {
   router.push("/");
 };
 
+// Watch untuk memastikan WebSocket selalu connected
+watch(isConnected, (connected) => {
+  console.log("🔗 WebSocket connection status:", connected);
+  if (connected && !webSocketListenersSetup) {
+    setupWebSocketListeners();
+  }
+});
+
 // Lifecycle
 onMounted(async () => {
+  console.log("=== DASHBOARD MOUNTED ===");
+
+  // Fetch user profile
   await fetchUserProfile();
+  console.log("✅ User profile loaded");
+
+  // Connect WebSocket
+  const token = localStorage.getItem("access_token");
+  if (token) {
+    console.log("🔌 Connecting WebSocket with token");
+    connect(token);
+  }
+
+  // Fetch initial data
   await Promise.all([fetchNotifications(), fetchSessions()]);
-  setupWebSocketListeners();
+  console.log("✅ Initial data loaded");
+
+  // Setup listeners jika sudah connected
+  if (isConnected.value) {
+    setupWebSocketListeners();
+  }
+});
+
+onUnmounted(() => {
+  webSocketListenersSetup = false;
 });
 </script>
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <!-- Toast Notifications -->
-    <ToastNotification :toasts="toastNotifications" />
-
     <!-- Header -->
     <DashboardHeader
       :user-name="userName"
       :user-identifier="userIdentifier"
       :user-type="userType"
-      :is-online="isOnline"
+      :is-online="isConnected"
       :user-photo="userPhoto"
       :is-loading="isLoadingProfile"
       @logout="logout"
@@ -216,7 +299,7 @@ onMounted(async () => {
           />
         </div>
 
-        <!-- Right Column - Chats & Notifications -->
+        <!-- Right Column - Notifications & Sessions -->
         <div class="lg:col-span-8 space-y-6">
           <NotificationsList
             :notifications="notifications"
