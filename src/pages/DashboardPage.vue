@@ -132,63 +132,37 @@ const setupWebSocketListeners = () => {
   // Event: Session dimulai oleh mahasiswa
   on("session_started", (data: any) => {
     console.log("📢 EVENT: session_started", data);
-
-    // Jika current user adalah dosen dan termasuk supervisor thesis ini
-    if (userType.value === "dosen") {
-      const supervisorIds = data.supervisors?.map((s: any) => s.id) || [];
-      const isSupervisor = supervisorIds.includes(userIdentifier.value);
-
-      if (isSupervisor) {
-        console.log("✅ Ini supervisor thesis ini, auto-refresh sessions");
-        // Auto-refresh sessions
-        fetchSessions();
-
-        // Show notification
-        showToast(`${data.student_name} memulai sesi bimbingan`, "info");
-      }
-    }
+    // Auto-refresh sessions
+    fetchSessions();
+    // Show notification
+    showToast(`${data.student_name} memulai sesi bimbingan`, "info");
   });
 
   // Event: Primary lecturer join
   on("primary_lecturer_joined", (data: any) => {
     console.log("📢 EVENT: primary_lecturer_joined", data);
-
-    if (userType.value === "dosen") {
-      fetchSessions();
-    }
-
-    if (userType.value === "mahasiswa") {
-      showToast(
-        `${data.supervisors[0]?.name || "Dosen"} telah bergabung`,
-        "info"
-      );
-    }
+    fetchSessions();
+    showToast(
+      `${data.supervisors[0]?.name || "Dosen"} telah bergabung`,
+      "info"
+    );
   });
 
   // Event: Secondary lecturer join
   on("secondary_lecturer_joined", (data: any) => {
     console.log("📢 EVENT: secondary_lecturer_joined", data);
-
-    if (userType.value === "dosen") {
-      fetchSessions();
-    }
-
-    if (userType.value === "mahasiswa") {
-      showToast(
-        `${data.supervisors[1]?.name || "Dosen"} telah bergabung`,
-        "info"
-      );
-    }
+    fetchSessions();
+    showToast(
+      `${data.supervisors[1]?.name || "Dosen"} telah bergabung`,
+      "info"
+    );
   });
 
   // Event: Student join
   on("student_joined", (data: any) => {
     console.log("📢 EVENT: student_joined", data);
-
-    if (userType.value === "dosen") {
-      fetchSessions();
-      showToast(`${data.student_name} bergabung ke sesi`, "info");
-    }
+    fetchSessions();
+    showToast(`${data.student_name} bergabung ke sesi`, "info");
   });
 
   // Event: Session ended
