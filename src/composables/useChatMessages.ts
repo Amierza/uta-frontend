@@ -13,7 +13,8 @@ export const useChatMessages = (
   sessionId: string,
   userId: Ref<string>,
   userType: Ref<string>,
-  showToast: (message: string, type?: ToastType, duration?: number) => void
+  showToast: (message: string, type?: ToastType, duration?: number) => void,
+  userName?: Ref<string> // Tambahkan parameter userName
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -52,7 +53,6 @@ export const useChatMessages = (
       >;
 
       if (response.status && response.data) {
-        // Map SessionResponse to Message
         const messagesData = Array.isArray(response.data)
           ? response.data
           : [response.data];
@@ -93,10 +93,12 @@ export const useChatMessages = (
     const messageText = newMessage.value.trim();
     const parentId = replyingTo.value?.id;
 
+    // PERBAIKAN: Tambahkan sender_name pada tempMessage
     const tempMessage: Message = {
       id: `temp-${Date.now()}`,
       session_id: sessionId,
       sender_id: userId.value,
+      sender_name: userName?.value || "You", // Gunakan userName dari parameter
       sender_role: userType.value === "mahasiswa" ? "student" : "lecturer",
       is_text: true,
       text: messageText,
@@ -126,6 +128,7 @@ export const useChatMessages = (
 
       await sendMessage(sessionId, payload);
 
+      // Hapus temporary message setelah berhasil
       const tempIndex = messages.value.findIndex(
         (m) => m.id === tempMessage.id
       );
@@ -137,6 +140,7 @@ export const useChatMessages = (
     } catch (error: any) {
       console.error("Failed to send message:", error);
 
+      // Hapus temporary message jika gagal
       const tempIndex = messages.value.findIndex(
         (m) => m.id === tempMessage.id
       );
@@ -167,6 +171,7 @@ export const useChatMessages = (
       return;
     }
 
+    // Hapus temporary message jika ada yang match
     const tempIndex = messages.value.findIndex(
       (m) =>
         m.is_sending && m.text === data.text && m.sender_id === data.sender_id
