@@ -34,7 +34,7 @@ const { sessionDetail, isLoadingDetail, fetchSessionDetail } = useSessions(
 const { on, connect, isConnected } = useWebSocket();
 const { show: showToast } = useNotificationToast();
 
-// Wrap showToast to match expected signature
+// Wrap showToast
 const toastWrapper = (
   message: string,
   type?: "info" | "success" | "warning" | "error"
@@ -44,7 +44,7 @@ const toastWrapper = (
 
 // Chat Participants
 const {
-  onlineParticipants,
+  // onlineParticipants,
   allParticipants,
   otherParticipants,
   getSenderName,
@@ -88,6 +88,21 @@ const { setupWebSocketListeners, resetWebSocket } = useChatWebSocket(
   toastWrapper
 );
 
+// ✅ PERBAIKAN 1: Check if current user is session owner
+const isSessionOwner = computed<boolean>(() => {
+  return userId.value === sessionDetail.value?.user_owner?.id;
+});
+
+// Can leave session (jika bukan owner)
+const canLeaveSession = computed<boolean>(() => {
+  return !isSessionOwner.value;
+});
+
+// Can end session (hanya owner)
+const canEndSession = computed<boolean>(() => {
+  return isSessionOwner.value;
+});
+
 // Computed
 const sessionTitle = computed<string>(() => {
   if (!sessionDetail.value) return "Loading...";
@@ -113,7 +128,17 @@ const replyToSenderName = computed<string>(() => {
   return replyingTo.value ? getSenderName(replyingTo.value) : "";
 });
 
-// Helper functions for message replies
+// ✅ PERBAIKAN 2: Fix online count
+// Hitung participant yang benar-benar online
+const trueOnlineCount = computed<number>(() => {
+  // Count dari participants yang statusnya online
+  return allParticipants.value.filter((p) => p.online).length;
+});
+
+const totalParticipantCount = computed<number>(() => {
+  return allParticipants.value.length;
+});
+
 const getReplyToMessage = (message: Message): Message | null => {
   if (!message.parent_message_id) return null;
   return messages.value.find((m) => m.id === message.parent_message_id) || null;
@@ -170,7 +195,6 @@ onMounted(async () => {
     console.log("✅ User profile loaded:", {
       userId: userId.value,
       userType: userType.value,
-      userIdentifier: userIdentifier.value,
     });
   } catch (error) {
     console.error("Failed to load user profile:", error);
@@ -181,7 +205,6 @@ onMounted(async () => {
   if (!isConnected.value) {
     const token = localStorage.getItem("access_token");
     if (token) {
-      console.log("Connecting WebSocket...");
       connect(token);
     }
   }
@@ -193,8 +216,8 @@ onMounted(async () => {
   try {
     await fetchSessionDetail(sessionId);
     console.log("✅ Session detail loaded:", {
-      student: sessionDetail.value?.thesis?.student,
-      supervisors: sessionDetail.value?.thesis?.supervisors,
+      owner: sessionDetail.value?.user_owner,
+      isCurrentUserOwner: isSessionOwner.value,
     });
   } catch (error) {
     console.error("Failed to load session detail:", error);
@@ -203,7 +226,7 @@ onMounted(async () => {
   }
 
   await fetchMessages();
-  console.log("✅ Messages loaded:", messages.value.length);
+  console.log("✅ Messages loaded");
 
   setupWebSocketListeners();
   scrollToBottom();
@@ -225,8 +248,12 @@ onUnmounted(() => {
       :session-status="sessionStatus"
       :other-participants="otherParticipants"
       :all-participants="allParticipants"
-      :online-count="onlineParticipants.size"
+      :online-count="trueOnlineCount"
+      :total-count="totalParticipantCount"
       :user-type="userType"
+      :is-session-owner="isSessionOwner"
+      :can-leave="canLeaveSession"
+      :can-end="canEndSession"
       @back="router.push('/dashboard')"
       @leave="handleLeaveSession"
       @end="handleEndSession"
@@ -254,7 +281,6 @@ onUnmounted(() => {
       class="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 chat-background"
     >
       <div class="max-w-4xl mx-auto space-y-4">
-        <!-- Empty state -->
         <div v-if="messages.length === 0" class="text-center py-16">
           <div
             class="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg"
@@ -279,13 +305,11 @@ onUnmounted(() => {
           </p>
         </div>
 
-        <!-- Messages grouped by date -->
         <div
           v-for="(msgs, date) in groupedMessages"
           :key="date"
           class="space-y-3"
         >
-          <!-- Date separator -->
           <div class="flex items-center justify-center my-8">
             <div
               class="bg-white/90 backdrop-blur-sm shadow-sm rounded-full px-5 py-2 border border-gray-200/50"
@@ -296,7 +320,6 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Messages -->
           <MessageBubble
             v-for="message in msgs"
             :key="message.id"

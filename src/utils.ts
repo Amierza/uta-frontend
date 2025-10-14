@@ -25,6 +25,10 @@ export const getAvatarColor = (name: string): string => {
 
 export const formatTime = (timestamp: string): string => {
   const date = new Date(timestamp);
+  if (isNaN(date.getTime())) {
+    console.warn("Invalid timestamp:", timestamp);
+    return "Invalid";
+  }
   return date.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
@@ -32,20 +36,31 @@ export const formatTime = (timestamp: string): string => {
 };
 
 export const formatDate = (timestamp: string): string => {
-  const date = new Date(timestamp);
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  try {
+    const date = new Date(timestamp);
 
-  if (date.toDateString() === today.toDateString()) {
-    return "Hari Ini";
-  } else if (date.toDateString() === yesterday.toDateString()) {
-    return "Kemarin";
-  } else {
-    return date.toLocaleDateString("id-ID", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-    });
+    if (isNaN(date.getTime())) {
+      console.warn("Invalid timestamp:", timestamp);
+      return "Invalid Date";
+    }
+
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) {
+      return "Hari Ini";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return "Kemarin";
+    } else {
+      return date.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+    }
+  } catch (error) {
+    console.error("Error formatting date:", timestamp, error);
+    return "Invalid Date";
   }
 };

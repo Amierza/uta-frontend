@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// import { computed } from "vue";
 import { getInitials, getAvatarColor } from "../utils";
 import type { Participant } from "../types/message";
 
@@ -8,7 +9,11 @@ interface Props {
   otherParticipants: Participant[];
   allParticipants: Participant[];
   onlineCount: number;
+  totalCount: number;
   userType: string;
+  isSessionOwner: boolean;
+  canLeave: boolean;
+  canEnd: boolean;
 }
 
 defineProps<Props>();
@@ -18,6 +23,15 @@ const emit = defineEmits<{
   leave: [];
   end: [];
 }>();
+
+// // ✅ Conditional button visibility
+// const showLeaveButton = computed(() => {
+//   return true; // Bisa leave jika sudah computed di parent
+// });
+
+// const showEndButton = computed(() => {
+//   return true; // Bisa end jika sudah computed di parent
+// });
 </script>
 
 <template>
@@ -26,7 +40,6 @@ const emit = defineEmits<{
   >
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex items-center justify-between h-16">
-        <!-- Left: Back button & Session info -->
         <div class="flex items-center space-x-3 sm:space-x-4 flex-1 min-w-0">
           <button
             @click="emit('back')"
@@ -48,7 +61,6 @@ const emit = defineEmits<{
           </button>
 
           <div class="flex items-center space-x-3 min-w-0 flex-1">
-            <!-- Avatar group -->
             <div class="relative flex-shrink-0 flex -space-x-2">
               <div
                 v-for="(participant, idx) in otherParticipants.slice(0, 2)"
@@ -66,18 +78,15 @@ const emit = defineEmits<{
               </div>
             </div>
 
-            <!-- Info -->
             <div class="min-w-0 flex-1">
               <h3
                 class="font-semibold text-gray-900 text-sm sm:text-base truncate"
               >
                 {{ sessionTitle }}
               </h3>
+              <!-- ✅ PERBAIKAN 2: Fix online count display -->
               <p class="text-xs text-gray-500 flex items-center space-x-1">
-                <span
-                  >{{ onlineCount }}/{{ allParticipants.length }} peserta
-                  online</span
-                >
+                <span>{{ onlineCount }}/{{ totalCount }} peserta online</span>
                 <span>•</span>
                 <span class="capitalize">{{ sessionStatus }}</span>
               </p>
@@ -85,21 +94,35 @@ const emit = defineEmits<{
           </div>
         </div>
 
-        <!-- Right: Action buttons -->
         <div class="flex items-center space-x-2 flex-shrink-0">
+          <!-- ✅ PERBAIKAN 1: Conditional leave/end buttons -->
+          <!-- Leave button - hanya bisa jika bukan owner -->
           <button
+            v-if="canLeave"
             @click="emit('leave')"
             class="hidden sm:flex px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
+            title="Tinggalkan sesi ini"
           >
             Tinggalkan
           </button>
+
+          <!-- End button - hanya owner yang bisa end -->
           <button
-            v-if="userType === 'dosen'"
+            v-if="canEnd"
             @click="emit('end')"
             class="hidden sm:flex px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-xl transition-all"
+            title="Akhiri sesi untuk semua peserta"
           >
             Akhiri Sesi
           </button>
+
+          <!-- Show badge jika session owner -->
+          <div
+            v-if="isSessionOwner"
+            class="hidden sm:flex px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded-lg"
+          >
+            Owner
+          </div>
         </div>
       </div>
     </div>
