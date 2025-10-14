@@ -27,10 +27,6 @@ export function useUser() {
         userId.value = userData.id;
         userType.value = userData.role === "lecturer" ? "dosen" : "mahasiswa";
 
-        // 👇 TAMBAHKAN INI
-        localStorage.setItem("userId", userData.id);
-        localStorage.setItem("user_type", userType.value);
-
         if (userData.role === "lecturer" && userData.lecturer) {
           userName.value = userData.lecturer.name;
           userIdentifier.value = userData.lecturer.nip;

@@ -16,6 +16,7 @@ import ProgressCard from "../components/ProgressCard.vue";
 import QuickActions from "../components/QuickActions.vue";
 import NotificationsList from "../components/NotificationsList.vue";
 import RecentSessions from "../components/RecentSessions.vue";
+import ToastNotification from "../components/ToastNotification.vue";
 
 const router = useRouter();
 
@@ -46,7 +47,8 @@ const {
   joinActiveSession,
 } = useSessions(userId, userType, userIdentifier);
 
-const { show: showToast } = useNotificationToast();
+const toastNotifications = ref([]); // Menyimpan notifikasi toast
+const { show: showToast } = useNotificationToast(); // Mengambil fungsi untuk menampilkan toast
 const { connect, on, isConnected } = useWebSocket();
 
 // State
@@ -258,6 +260,9 @@ onUnmounted(() => {
 
 <template>
   <div class="min-h-screen bg-gray-50">
+    <!-- Toast Notifications -->
+    <ToastNotification :toasts="toastNotifications" />
+
     <!-- Header -->
     <DashboardHeader
       :user-name="userName"

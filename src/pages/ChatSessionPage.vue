@@ -17,26 +17,12 @@ const sessionId = route.params.session_id as string;
 
 // Composables
 const { userId, userType, userIdentifier, fetchUserProfile } = useUser();
-const actualUserId = computed(() => {
-  if (userId.value) return userId.value;
-  const storedUser = localStorage.getItem("user");
-  if (storedUser) {
-    try {
-      const parsed = JSON.parse(storedUser);
-      return parsed.id || parsed.user_id || "";
-    } catch (e) {
-      console.error("Failed to parse user:", e);
-    }
-  }
-  return localStorage.getItem("userId") || "";
-});
-
 const { sessionDetail, isLoadingDetail, fetchSessionDetail } = useSessions(
   userId,
   userType,
   userIdentifier
 );
-const { on } = useWebSocket();
+const { on, connect, isConnected } = useWebSocket();
 const { show: showToast } = useNotificationToast();
 
 // State
@@ -46,17 +32,40 @@ const replyingTo = ref<any | null>(null);
 const isSending = ref(false);
 const isLoadingMessages = ref(false);
 const chatContainer = ref<HTMLElement | null>(null);
-
-// Track online participants
 const onlineParticipants = ref<Set<string>>(new Set());
 
-// Computed
+// Build sender map dari session detail
+const senderMap = computed(() => {
+  if (!sessionDetail.value) return new Map<string, string>();
+
+  const map = new Map<string, string>();
+
+  try {
+    // Add student
+    if (sessionDetail.value.thesis?.student) {
+      const student = sessionDetail.value.thesis.student;
+      map.set(student.id, student.name);
+    }
+
+    // Add supervisors
+    if (sessionDetail.value.thesis?.supervisors) {
+      sessionDetail.value.thesis.supervisors.forEach((supervisor: any) => {
+        map.set(supervisor.id, supervisor.name);
+      });
+    }
+  } catch (error) {
+    console.error("Error building sender map:", error);
+  }
+
+  return map;
+});
+
+// All participants with online status
 const allParticipants = computed(() => {
   if (!sessionDetail.value) return [];
 
   const participants: any[] = [];
 
-  // Add student
   if (sessionDetail.value.thesis?.student) {
     participants.push({
       id: sessionDetail.value.thesis.student.id,
@@ -69,7 +78,6 @@ const allParticipants = computed(() => {
     });
   }
 
-  // Add supervisors
   if (sessionDetail.value.thesis?.supervisors) {
     sessionDetail.value.thesis.supervisors.forEach((s: any) => {
       participants.push({
@@ -86,14 +94,14 @@ const allParticipants = computed(() => {
 });
 
 const otherParticipants = computed(() => {
-  return allParticipants.value.filter((p) => p.id !== actualUserId.value);
+  return allParticipants.value.filter((p) => p.id !== userId.value);
 });
 
 const sessionTitle = computed(() => {
   if (!sessionDetail.value) return "Loading...";
 
   if (userType.value === "mahasiswa") {
-    const supervisors = sessionDetail.value.thesis.supervisors;
+    const supervisors = sessionDetail.value.thesis?.supervisors;
     if (supervisors?.length > 1) {
       return `Bimbingan dengan ${supervisors
         .map((s: any) => s.name)
@@ -101,7 +109,9 @@ const sessionTitle = computed(() => {
     }
     return `Bimbingan dengan ${supervisors?.[0]?.name || "Dosen"}`;
   } else {
-    return `Bimbingan dengan ${sessionDetail.value.thesis.student.name}`;
+    return `Bimbingan dengan ${
+      sessionDetail.value.thesis?.student?.name || "Mahasiswa"
+    }`;
   }
 });
 
@@ -159,6 +169,7 @@ const fetchMessages = async () => {
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
 
+      console.log("Messages loaded:", messages.value.length);
       scrollToBottom();
     }
   } catch (error) {
@@ -178,7 +189,7 @@ const handleSendMessage = async () => {
   const tempMessage = {
     id: `temp-${Date.now()}`,
     session_id: sessionId,
-    sender_id: actualUserId.value,
+    sender_id: userId.value,
     sender_role: userType.value === "mahasiswa" ? "student" : "lecturer",
     is_text: true,
     text: messageText,
@@ -331,43 +342,66 @@ const groupedMessages = computed(() => {
 });
 
 const getSenderName = (message: any) => {
-  if (!sessionDetail.value) return "Unknown";
+  if (!message || !message.sender_id) return "Unknown";
 
-  const allParts = [
-    sessionDetail.value.thesis.student,
-    ...(sessionDetail.value.thesis.supervisors || []),
-  ];
+  // Priority 1: Check senderMap (built dari sessionDetail)
+  const senderFromMap = senderMap.value.get(message.sender_id);
+  if (senderFromMap) {
+    return senderFromMap;
+  }
 
-  const sender = allParts.find((p: any) => p.id === message.sender_id);
-  return sender?.name || "Unknown";
+  // Priority 2: Check message.sender_name (jika backend provide)
+  if (message.sender_name) {
+    return message.sender_name;
+  }
+
+  // Priority 3: Fallback ke search manual
+  if (sessionDetail.value?.thesis) {
+    const student = sessionDetail.value.thesis.student;
+    if (student?.id === message.sender_id) {
+      return student.name;
+    }
+
+    const supervisor = sessionDetail.value.thesis.supervisors?.find(
+      (s: any) => s.id === message.sender_id
+    );
+    if (supervisor?.name) {
+      return supervisor.name;
+    }
+  }
+
+  console.warn(`Sender not found for ID: ${message.sender_id}`);
+  return "Unknown";
 };
 
 const isMyMessage = (message: any) => {
-  return message.sender_id === actualUserId.value;
+  return message.sender_id === userId.value;
 };
 
-// WebSocket listeners setup - dengan debounce
+// WebSocket listeners setup
 let webSocketInitialized = false;
 
 const setupWebSocketListeners = () => {
   if (webSocketInitialized) return;
   webSocketInitialized = true;
 
-  console.log("🔌 Setting up WebSocket listeners for session:", sessionId);
+  console.log("Setting up WebSocket listeners for session:", sessionId);
 
-  // New message event
   on("new_message", (data: any) => {
-    console.log("📨 NEW MESSAGE EVENT:", data);
+    console.log("New message event received:", {
+      id: data.id,
+      sender_id: data.sender_id,
+      text: data.text?.substring(0, 30),
+    });
 
     if (data.session_id !== sessionId) {
-      console.warn("⚠️ Message dari session berbeda, ignoring");
+      console.warn("Message dari session berbeda, ignoring");
       return;
     }
 
-    // Cek duplikat
     const exists = messages.value.some((m) => m.id === data.id);
     if (exists) {
-      console.log("⏭️ Message sudah ada, skipping");
+      console.log("Message sudah ada, skipping");
       return;
     }
 
@@ -380,6 +414,7 @@ const setupWebSocketListeners = () => {
       file_type: data.file_type,
       sender_role: data.sender_role,
       sender_id: data.sender_id,
+      sender_name: data.sender_name, // Include jika ada
       session_id: data.session_id,
       parent_message_id: data.parent_message_id,
       timestamp: data.timestamp || new Date().toISOString(),
@@ -396,49 +431,47 @@ const setupWebSocketListeners = () => {
       messages.value.splice(tempIndex, 1);
     }
 
-    // Add new message (maintain chronological order)
+    // Add new message
     messages.value.push(messageData);
     messages.value.sort(
       (a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
-    console.log("✅ Message added, total:", messages.value.length);
+    console.log("Message added, total:", messages.value.length);
     scrollToBottom();
   });
 
-  // Session joined events - track online participants
   on("session_started", (data: any) => {
-    console.log("🎬 Session started:", data);
+    console.log("Session started event");
     if (data.student_id) {
       onlineParticipants.value.add(data.student_id);
     }
   });
 
   on("primary_lecturer_joined", (data: any) => {
-    console.log("👤 Primary lecturer joined:", data);
+    console.log("Primary lecturer joined event");
     if (data.supervisors?.[0]?.id) {
       onlineParticipants.value.add(data.supervisors[0].id);
     }
   });
 
   on("secondary_lecturer_joined", (data: any) => {
-    console.log("👤 Secondary lecturer joined:", data);
+    console.log("Secondary lecturer joined event");
     if (data.supervisors?.[1]?.id) {
       onlineParticipants.value.add(data.supervisors[1].id);
     }
   });
 
   on("student_joined", (data: any) => {
-    console.log("👤 Student joined:", data);
+    console.log("Student joined event");
     if (data.student_id) {
       onlineParticipants.value.add(data.student_id);
     }
   });
 
-  // Leave events
   on("primary_lecturer_leaved", (data: any) => {
-    console.log("👋 Primary lecturer left");
+    console.log("Primary lecturer left event");
     if (data.supervisors?.[0]?.id) {
       onlineParticipants.value.delete(data.supervisors[0].id);
     }
@@ -446,7 +479,7 @@ const setupWebSocketListeners = () => {
   });
 
   on("secondary_lecturer_leaved", (data: any) => {
-    console.log("👋 Secondary lecturer left");
+    console.log("Secondary lecturer left event");
     if (data.supervisors?.[1]?.id) {
       onlineParticipants.value.delete(data.supervisors[1].id);
     }
@@ -454,15 +487,15 @@ const setupWebSocketListeners = () => {
   });
 
   on("student_leaved", (data: any) => {
-    console.log("👋 Student left");
+    console.log("Student left event");
     if (data.student_id) {
       onlineParticipants.value.delete(data.student_id);
     }
     showToast("Mahasiswa telah meninggalkan sesi.", "warning");
   });
 
-  on("user_ended", (data: any) => {
-    console.log(`🔚 Session ended by: ${data.thesis_id}`);
+  on("user_ended", () => {
+    console.log("Session ended event");
     showToast("Sesi bimbingan telah diakhiri.", "info");
     setTimeout(() => {
       router.push("/dashboard");
@@ -475,29 +508,40 @@ onMounted(async () => {
   console.log("=== CHAT ROOM MOUNTED ===");
   console.log("Session ID:", sessionId);
 
-  await fetchUserProfile();
-  await nextTick();
-
-  console.log("User ID:", actualUserId.value);
-  console.log("User Type:", userType.value);
-
-  if (!actualUserId.value) {
+  try {
+    await fetchUserProfile();
+    console.log("User profile loaded, userId:", userId.value);
+  } catch (error) {
+    console.error("Failed to load user profile:", error);
     showToast("Gagal memuat data pengguna.", "error");
     return;
   }
 
-  // Set current user sebagai online
-  onlineParticipants.value.add(actualUserId.value);
+  if (!isConnected.value) {
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      console.log("Connecting WebSocket...");
+      connect(token);
+    }
+  }
 
-  await fetchSessionDetail(sessionId);
-  console.log("Session detail loaded");
+  if (userId.value) {
+    onlineParticipants.value.add(userId.value);
+  }
+
+  try {
+    await fetchSessionDetail(sessionId);
+    console.log("Session detail loaded");
+  } catch (error) {
+    console.error("Failed to load session detail:", error);
+    showToast("Gagal memuat detail sesi.", "error");
+    return;
+  }
 
   await fetchMessages();
-  console.log("Messages loaded:", messages.value.length);
+  console.log("Messages loaded");
 
   setupWebSocketListeners();
-  console.log("WebSocket listeners setup complete");
-
   scrollToBottom();
 });
 
@@ -550,7 +594,6 @@ onUnmounted(() => {
                   <span class="text-white font-semibold text-xs sm:text-sm">
                     {{ getInitials(participant.name) }}
                   </span>
-                  <!-- Online indicator -->
                   <div
                     v-if="participant.online"
                     class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"
@@ -702,7 +745,7 @@ onUnmounted(() => {
                 <!-- Message content -->
                 <div
                   :class="[
-                    'rounded-2xl px-4 py-2.5 break-words shadow-sm',
+                    'rounded-2xl px-4 py-2.5 break-words shadow-sm relative',
                     isMyMessage(message)
                       ? 'bg-blue-600 text-white rounded-tr-sm'
                       : 'bg-white text-gray-900 border border-gray-200/50 rounded-tl-sm',
