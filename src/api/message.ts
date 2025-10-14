@@ -9,8 +9,7 @@ export const sendMessage = async (
   payload: SendMessageRequest
 ): Promise<SuccessResponse<MessageResponse> | ErrorResponse> => {
   const token = localStorage.getItem("access_token");
-  const response = await api.post(`/sessions/${sessionId}/messages`, {
-    payload,
+  const response = await api.post(`/sessions/${sessionId}/messages`, payload, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
