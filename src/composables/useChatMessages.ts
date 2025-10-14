@@ -14,7 +14,10 @@ export const useChatMessages = (
   userId: Ref<string>,
   userType: Ref<string>,
   showToast: (message: string, type?: ToastType, duration?: number) => void,
-  getSenderNameFn: (message: Message | { sender: CustomUserResponse }) => string
+  getSenderNameFn: (
+    message: Message | { sender: CustomUserResponse }
+  ) => string,
+  fetchSessionDetail?: (sessionId: string) => Promise<void>
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -57,31 +60,41 @@ export const useChatMessages = (
           ? response.data
           : [response.data];
 
-        messages.value = messagesData.map((msg: any) => ({
-          id: msg.id,
-          session_id: msg.session_id || sessionId,
-          sender: msg.sender || {
-            id: msg.sender_id,
-            name: msg.sender_name,
-            identifier: msg.sender_identifier || "",
-            role: msg.sender_role,
-          },
-          is_text: msg.is_text,
-          text: msg.text,
-          file_url: msg.file_url,
-          file_type: msg.file_type,
-          parent_message_id: msg.parent_message_id,
-          timestamp: msg.timestamp,
-          event: msg.event,
-        }));
+        // Check if there are new messages
+        if (messagesData.length > messages.value.length) {
+          console.log("📬 New messages detected");
 
-        messages.value.sort(
-          (a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
+          // ⬇️ RE-FETCH SESSION DETAIL untuk update participant list
+          if (fetchSessionDetail) {
+            await fetchSessionDetail(sessionId);
+          }
 
-        console.log("Messages loaded:", messages.value.length);
-        scrollToBottom();
+          messages.value = messagesData.map((msg: any) => ({
+            id: msg.id,
+            session_id: msg.session_id || sessionId,
+            sender: msg.sender || {
+              id: msg.sender_id,
+              name: msg.sender_name,
+              identifier: msg.sender_identifier || "",
+              role: msg.sender_role,
+            },
+            is_text: msg.is_text,
+            text: msg.text,
+            file_url: msg.file_url,
+            file_type: msg.file_type,
+            parent_message_id: msg.parent_message_id,
+            timestamp: msg.timestamp,
+            event: msg.event,
+          }));
+
+          messages.value.sort(
+            (a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+
+          console.log("Messages loaded:", messages.value.length);
+          scrollToBottom();
+        }
       }
     } catch (error) {
       console.error("Failed to fetch messages:", error);
