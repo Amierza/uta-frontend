@@ -16,9 +16,35 @@ const router = useRouter();
 const sessionId = route.params.session_id as string;
 
 // Composables
-const { userId, userType, userIdentifier } = useUser();
+const { userId, userType, userIdentifier, fetchUserProfile } = useUser();
+
+// Fallback: Get userId from localStorage if composable returns empty
+const actualUserId = computed(() => {
+  if (userId.value) return userId.value;
+
+  // Try to get from localStorage
+  const storedUser = localStorage.getItem("user");
+  if (storedUser) {
+    try {
+      const parsed = JSON.parse(storedUser);
+      return parsed.id || parsed.user_id || parsed.userId || "";
+    } catch (e) {
+      console.error("Failed to parse user from localStorage:", e);
+    }
+  }
+
+  // Try alternative storage keys
+  const altId =
+    localStorage.getItem("userId") ||
+    localStorage.getItem("user_id") ||
+    sessionStorage.getItem("userId") ||
+    sessionStorage.getItem("user_id");
+
+  return altId || "";
+});
+
 const { sessionDetail, isLoadingDetail, fetchSessionDetail } = useSessions(
-  userId,
+  actualUserId,
   userType,
   userIdentifier
 );
@@ -135,7 +161,7 @@ const handleSendMessage = async () => {
   const tempMessage = {
     id: `temp-${Date.now()}`,
     session_id: sessionId,
-    sender_id: userId.value,
+    sender_id: actualUserId.value,
     sender_role: userType.value === "mahasiswa" ? "student" : "lecturer",
     is_text: true,
     text: messageText,
@@ -145,6 +171,8 @@ const handleSendMessage = async () => {
     timestamp: new Date().toISOString(),
     is_sending: true, // Flag untuk menandai pesan sedang dikirim
   };
+
+  console.log("Sending message with userId:", actualUserId.value);
 
   // Add to messages immediately
   messages.value.push(tempMessage);
@@ -309,12 +337,13 @@ const getSenderName = (message: any) => {
 
 // Check if message is from current user
 const isMyMessage = (message: any) => {
+  const currentId = actualUserId.value;
   console.log("Checking isMyMessage:", {
     messageSenderId: message.sender_id,
-    currentUserId: userId.value,
-    isMatch: message.sender_id === userId.value,
+    currentUserId: currentId,
+    isMatch: message.sender_id === currentId,
   });
-  return message.sender_id === userId.value;
+  return message.sender_id === currentId;
 };
 
 // WebSocket listeners
@@ -322,6 +351,8 @@ const setupWebSocketListeners = () => {
   // New message event
   on("new_message", (data: any) => {
     console.log("📨 New message received:", data);
+    console.log("Current userId:", userId.value);
+    console.log("Current messages count:", messages.value.length);
 
     const messageData = {
       id: data.id,
@@ -336,6 +367,8 @@ const setupWebSocketListeners = () => {
       timestamp: data.timestamp || new Date().toISOString(),
     };
 
+    console.log("Processed message data:", messageData);
+
     // Remove temporary message if exists
     const tempIndex = messages.value.findIndex(
       (m) =>
@@ -344,14 +377,21 @@ const setupWebSocketListeners = () => {
         m.sender_id === messageData.sender_id
     );
     if (tempIndex !== -1) {
+      console.log("Removing temp message at index:", tempIndex);
       messages.value.splice(tempIndex, 1);
     }
 
     // Check if message already exists (by real ID)
     const exists = messages.value.some((m) => m.id === messageData.id);
+    console.log("Message exists?", exists);
+
     if (!exists) {
+      console.log("Adding new message to array");
       messages.value.push(messageData);
+      console.log("New messages count:", messages.value.length);
       scrollToBottom();
+    } else {
+      console.log("Message already exists, skipping");
     }
   });
 
@@ -431,9 +471,43 @@ watch(sessionStatus, (newStatus) => {
 
 // Lifecycle
 onMounted(async () => {
+  console.log("=== Component Mounted ===");
+  console.log("Session ID:", sessionId);
+  console.log("User ID from composable (before fetch):", userId.value);
+
+  // CRITICAL: Always fetch user profile to ensure we have the latest data
+  console.log("🔄 Fetching user profile...");
+  await fetchUserProfile();
+  console.log("✅ User profile fetched");
+  console.log("User ID after fetch:", userId.value);
+  console.log("User Type:", userType.value);
+  console.log("User Identifier:", userIdentifier.value);
+
+  // Wait a bit for reactive updates
+  await nextTick();
+
+  console.log("Actual User ID (computed):", actualUserId.value);
+
+  // Debug localStorage
+  console.log("LocalStorage user:", localStorage.getItem("user"));
+  console.log("LocalStorage userId:", localStorage.getItem("userId"));
+  console.log("LocalStorage user_type:", localStorage.getItem("user_type"));
+
+  if (!actualUserId.value) {
+    console.error("❌ CRITICAL: actualUserId is still empty after fetch!");
+    showToast("Gagal memuat data pengguna. Silakan refresh halaman.", "error");
+    return;
+  }
+
   await fetchSessionDetail(sessionId);
+  console.log("Session detail loaded:", sessionDetail.value);
+
   await fetchMessages();
+  console.log("Messages loaded:", messages.value.length);
+
   setupWebSocketListeners();
+  console.log("WebSocket listeners setup complete");
+
   scrollToBottom();
 });
 
