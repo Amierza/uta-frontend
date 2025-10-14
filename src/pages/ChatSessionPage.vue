@@ -24,7 +24,8 @@ const router = useRouter();
 const sessionId = route.params.session_id as string;
 
 // Composables
-const { userId, userType, userIdentifier, fetchUserProfile } = useUser();
+const { userId, userType, userName, userIdentifier, fetchUserProfile } =
+  useUser();
 const { sessionDetail, isLoadingDetail, fetchSessionDetail } = useSessions(
   userId,
   userType,
@@ -68,7 +69,15 @@ const {
   setReplyTo,
   cancelReply,
   scrollToBottom,
-} = useChatMessages(sessionId, userId, userType, toastWrapper, getSenderName);
+} = useChatMessages(
+  sessionId,
+  userId,
+  userName,
+  userIdentifier,
+  userType,
+  toastWrapper,
+  getSenderName
+);
 
 // WebSocket Setup
 const { setupWebSocketListeners, resetWebSocket } = useChatWebSocket(

@@ -3,8 +3,6 @@ import { sendMessage, getMessages } from "../api/message";
 import { formatDate } from "../utils";
 import type { Message, GroupedMessages } from "../types/message";
 import type { SendMessageRequest } from "../types/message";
-import type { SuccessResponse } from "../types/api";
-import type { SessionResponse } from "../types/session";
 import type { CustomUserResponse } from "../types/user";
 
 type ToastType = "info" | "success" | "warning" | "error";
@@ -12,12 +10,11 @@ type ToastType = "info" | "success" | "warning" | "error";
 export const useChatMessages = (
   sessionId: string,
   userId: Ref<string>,
+  userName: Ref<string>,
+  userIdentifier: Ref<string>,
   userType: Ref<string>,
   showToast: (message: string, type?: ToastType, duration?: number) => void,
-  getSenderNameFn: (
-    message: Message | { sender: CustomUserResponse }
-  ) => string,
-  fetchSessionDetail?: (sessionId: string) => Promise<void>
+  getSenderNameFn: (message: Message | { sender: CustomUserResponse }) => string
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -51,53 +48,37 @@ export const useChatMessages = (
   const fetchMessages = async (): Promise<void> => {
     try {
       isLoadingMessages.value = true;
-      const response = (await getMessages(sessionId)) as SuccessResponse<
-        SessionResponse[]
-      >;
+      const response = await getMessages(sessionId); // Panggilan ke API
 
-      if (response.status && response.data) {
-        const messagesData = Array.isArray(response.data)
-          ? response.data
-          : [response.data];
+      if (response.status && Array.isArray(response.data)) {
+        const messagesData = response.data.map((msg: any) => ({
+          id: msg.id,
+          session_id: msg.session_id || sessionId, // Sesuaikan dengan yang diharapkan
+          sender: {
+            id: msg.sender_id,
+            name: msg.sender_name || "Unknown", // Tambahkan fallback
+            identifier: msg.sender_identifier || "",
+            role: msg.sender_role || "student", // Tambahkan fallback
+          },
+          is_text: msg.is_text,
+          text: msg.text,
+          file_url: msg.file_url || null,
+          file_type: msg.file_type || null,
+          parent_message_id: msg.parent_message_id || null,
+          timestamp: msg.timestamp || new Date().toISOString(),
+          is_sending: false, // Tambahkan properti ini jika perlu
+        }));
 
-        // Check if there are new messages
-        if (messagesData.length > messages.value.length) {
-          console.log("📬 New messages detected");
-
-          // ⬇️ RE-FETCH SESSION DETAIL untuk update participant list
-          if (fetchSessionDetail) {
-            await fetchSessionDetail(sessionId);
-          }
-
-          messages.value = messagesData.map((msg: any) => ({
-            id: msg.id,
-            session_id: msg.session_id || sessionId,
-            sender: msg.sender || {
-              id: msg.sender_id,
-              name: msg.sender_name,
-              identifier: msg.sender_identifier || "",
-              role: msg.sender_role,
-            },
-            is_text: msg.is_text,
-            text: msg.text,
-            file_url: msg.file_url,
-            file_type: msg.file_type,
-            parent_message_id: msg.parent_message_id,
-            timestamp: msg.timestamp,
-            event: msg.event,
-          }));
-
-          messages.value.sort(
-            (a, b) =>
-              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          );
-
-          console.log("Messages loaded:", messages.value.length);
-          scrollToBottom();
-        }
+        messages.value = messagesData.sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        ); // Urutkan berdasarkan timestamp
+        console.log("Messages loaded:", messages.value.length);
+      } else {
+        throw new Error("Failed to load messages");
       }
     } catch (error) {
-      console.error("Failed to fetch messages:", error);
+      console.error("Error fetching messages:", error);
     } finally {
       isLoadingMessages.value = false;
     }
@@ -113,8 +94,8 @@ export const useChatMessages = (
     const currentUserName = getSenderNameFn({
       sender: {
         id: userId.value,
-        name: "",
-        identifier: "",
+        name: userName.value,
+        identifier: userIdentifier.value,
         role: userType.value === "mahasiswa" ? "student" : "lecturer",
       },
     });
