@@ -348,21 +348,37 @@ const isMyMessage = (message: any) => {
 
 // WebSocket listeners
 const setupWebSocketListeners = () => {
+  console.log("🔌 Setting up WebSocket listeners for session:", sessionId);
+
+  // Test if WebSocket is connected
+  console.log("WebSocket instance:", useWebSocket());
+
   // New message event
   on("new_message", (data: any) => {
-    console.log("📨 New message received:", data);
-    console.log("Current userId:", userId.value);
+    console.log("📨 NEW MESSAGE EVENT RECEIVED!");
+    console.log("Raw data:", data);
+    console.log("Current userId:", actualUserId.value);
     console.log("Current messages count:", messages.value.length);
+    console.log("Session ID match?", data.session_id === sessionId);
+
+    // Validate session_id
+    if (data.session_id !== sessionId) {
+      console.warn(
+        "⚠️ Message session_id does not match current session, ignoring"
+      );
+      return;
+    }
 
     const messageData = {
       id: data.id,
-      session_id: data.session_id,
-      sender_id: data.sender_id,
-      sender_role: data.sender_role,
+      event: data.event,
       is_text: data.is_text,
       text: data.text,
       file_url: data.file_url,
       file_type: data.file_type,
+      sender_role: data.sender_role,
+      sender_id: data.sender_id,
+      session_id: data.session_id,
       parent_message_id: data.parent_message_id,
       timestamp: data.timestamp || new Date().toISOString(),
     };
@@ -377,7 +393,7 @@ const setupWebSocketListeners = () => {
         m.sender_id === messageData.sender_id
     );
     if (tempIndex !== -1) {
-      console.log("Removing temp message at index:", tempIndex);
+      console.log("🗑️ Removing temp message at index:", tempIndex);
       messages.value.splice(tempIndex, 1);
     }
 
@@ -386,12 +402,16 @@ const setupWebSocketListeners = () => {
     console.log("Message exists?", exists);
 
     if (!exists) {
-      console.log("Adding new message to array");
+      console.log("✅ Adding new message to array");
       messages.value.push(messageData);
       console.log("New messages count:", messages.value.length);
-      scrollToBottom();
+
+      // Force component update
+      nextTick(() => {
+        scrollToBottom();
+      });
     } else {
-      console.log("Message already exists, skipping");
+      console.log("⏭️ Message already exists, skipping");
     }
   });
 
