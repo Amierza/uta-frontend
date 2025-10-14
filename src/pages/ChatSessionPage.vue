@@ -309,6 +309,11 @@ const getSenderName = (message: any) => {
 
 // Check if message is from current user
 const isMyMessage = (message: any) => {
+  console.log("Checking isMyMessage:", {
+    messageSenderId: message.sender_id,
+    currentUserId: userId.value,
+    isMatch: message.sender_id === userId.value,
+  });
   return message.sender_id === userId.value;
 };
 
