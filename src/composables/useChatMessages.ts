@@ -14,7 +14,7 @@ export const useChatMessages = (
   userId: Ref<string>,
   userType: Ref<string>,
   showToast: (message: string, type?: ToastType, duration?: number) => void,
-  userName?: Ref<string> // Tambahkan parameter userName
+  getSenderNameFn: (message: Message | { sender_id: string }) => string
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -93,12 +93,20 @@ export const useChatMessages = (
     const messageText = newMessage.value.trim();
     const parentId = replyingTo.value?.id;
 
-    // PERBAIKAN: Tambahkan sender_name pada tempMessage
+    // Gunakan getSenderNameFn untuk mendapatkan nama yang benar
+    const senderName = getSenderNameFn({ sender_id: userId.value });
+
+    console.log("📤 Sending message with sender:", {
+      userId: userId.value,
+      senderName,
+      userType: userType.value,
+    });
+
     const tempMessage: Message = {
       id: `temp-${Date.now()}`,
       session_id: sessionId,
       sender_id: userId.value,
-      sender_name: userName?.value || "You", // Gunakan userName dari parameter
+      sender_name: senderName,
       sender_role: userType.value === "mahasiswa" ? "student" : "lecturer",
       is_text: true,
       text: messageText,
@@ -177,6 +185,7 @@ export const useChatMessages = (
         m.is_sending && m.text === data.text && m.sender_id === data.sender_id
     );
     if (tempIndex !== -1) {
+      console.log("🔄 Replacing temp message with real message");
       messages.value.splice(tempIndex, 1);
     }
 

@@ -40,6 +40,18 @@ const toastWrapper = (
   showToast(message, type);
 };
 
+// Chat Participants
+const {
+  onlineParticipants,
+  allParticipants,
+  otherParticipants,
+  getSenderName,
+  isMyMessage,
+  addOnlineParticipant,
+  removeOnlineParticipant,
+  clearOnlineParticipants,
+} = useChatParticipants(sessionDetail, userId);
+
 // Chat Messages
 const {
   messages,
@@ -55,19 +67,7 @@ const {
   setReplyTo,
   cancelReply,
   scrollToBottom,
-} = useChatMessages(sessionId, userId, userType, toastWrapper);
-
-// Chat Participants
-const {
-  onlineParticipants,
-  allParticipants,
-  otherParticipants,
-  getSenderName,
-  isMyMessage,
-  addOnlineParticipant,
-  removeOnlineParticipant,
-  clearOnlineParticipants,
-} = useChatParticipants(sessionDetail, userId);
+} = useChatMessages(sessionId, userId, userType, toastWrapper, getSenderName);
 
 // WebSocket Setup
 const { setupWebSocketListeners, resetWebSocket } = useChatWebSocket(
