@@ -54,6 +54,8 @@ const {
   clearOnlineParticipants,
 } = useChatParticipants(sessionDetail, userId);
 
+console.log("all participants", allParticipants);
+
 // Chat Messages
 const {
   messages,
@@ -133,6 +135,8 @@ const trueOnlineCount = computed<number>(() => {
   // Count dari participants yang statusnya online
   return allParticipants.value.filter((p) => p.online).length;
 });
+
+console.log("true online count: ", trueOnlineCount);
 
 const totalParticipantCount = computed<number>(() => {
   return allParticipants.value.length;
