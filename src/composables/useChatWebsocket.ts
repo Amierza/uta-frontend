@@ -25,23 +25,73 @@ export const useChatWebSocket = (
     webSocketListenersSetupPerformed = true;
     console.log("🔌 Setting up WebSocket listeners for session:", sessionId);
 
+    let userOnlineMap: {
+      id: string;
+      role: string;
+      name: string;
+      event: string;
+    }[] = [];
+
+    const handleUserLeave = (role: string) => {
+      const user = userOnlineMap.find((u) => u.role === role);
+      if (user) {
+        console.log(`❌ ${user.role} left:`, user.id);
+        userOnlineMap = userOnlineMap.filter((u) => u.id !== user.id);
+        removeOnlineParticipant(user.id);
+        showToast(`${user.name} telah meninggalkan sesi.`, "warning");
+      } else {
+        console.log(`No ${role} found in userOnlineMap`);
+      }
+    };
+
     // ============================================
     // Event: session_started
-    // Student started the session
-    // Recipients: Primary & Secondary Supervisors
     // ============================================
     on("session_started", (data: WebSocketEventData) => {
-      console.log("🎬 session_started event:", data);
+      try {
+        console.log("🎬 session_started event:", data);
+        if (data.student_id || data.supervisors) {
+          if (data.student_id) {
+            console.log(
+              "✅ Student is online (started session):",
+              data.student_id
+            );
+            userOnlineMap.push({
+              id: data.student_id,
+              role: "student",
+              name: data.student_name || "Unknown",
+              event: "session_started",
+            });
+            addOnlineParticipant(data.student_id);
+            showToast(
+              `${data.student_name} telah memulai sesi bimbingan.`,
+              "info"
+            );
+          }
 
-      // Student yang start sudah online (dia yg start)
-      // Kita yang terima event ini berarti kita supervisor
-      // Maka: student sudah online
-      if (data.student_id) {
-        console.log("✅ Student is online (started session):", data.student_id);
-        addOnlineParticipant(data.student_id);
+          if (data.supervisors) {
+            console.log(
+              "✅ Supervisors is online (started session):",
+              data.supervisors[0].name
+            );
+            userOnlineMap.push({
+              id: data.supervisors[0].id,
+              role: data.supervisors[0].role,
+              name: data.supervisors[0].name,
+              event: "session_started",
+            });
+            addOnlineParticipant(data.supervisors[0].id);
+            showToast(
+              `${data.supervisors[0].name} telah memulai sesi bimbingan.`,
+              "info"
+            );
+          }
+        } else {
+          console.log("Unknown user start the session");
+        }
+      } catch (err) {
+        console.log("Error handling event session_started:", err);
       }
-
-      showToast(`${data.student_name} telah memulai sesi bimbingan.`, "info");
     });
 
     // ============================================
@@ -50,21 +100,37 @@ export const useChatWebSocket = (
     // Recipients: Student & Secondary Supervisor (if any)
     // ============================================
     on("primary_lecturer_joined", (data: WebSocketEventData) => {
-      console.log("👤 primary_lecturer_joined event:", data);
-
-      // Yang join = primary lecturer, dia sudah online
-      // Student pasti sudah online (karena dia yang start atau sudah join)
-      if (data.student_id) {
-        addOnlineParticipant(data.student_id);
-      }
-
-      // Primary lecturer yang baru join
-      if (data.supervisors && data.supervisors[0]?.id) {
-        const primaryId = data.supervisors[0].id;
-        const primaryName = data.supervisors[0].name;
-        console.log("✅ Primary lecturer is online (just joined):", primaryId);
-        addOnlineParticipant(primaryId);
-        showToast(`${primaryName} telah bergabung ke sesi.`, "info");
+      try {
+        console.log("👤 primary_lecturer_joined event:", data);
+        if (data.supervisors && data.supervisors.length > 0) {
+          const primary = data.supervisors.find(
+            (s) => s.role === "primary_lecturer"
+          );
+          if (primary) {
+            console.log(
+              "✅ Primary lecturer is online (just joined):",
+              primary.name
+            );
+            if (!userOnlineMap.some((u) => u.id === primary.id)) {
+              userOnlineMap.push({
+                id: primary.id,
+                role: primary.role,
+                name: primary.name,
+                event: "primary_lecturer_joined",
+              });
+              addOnlineParticipant(primary.id);
+              showToast(`${primary.name} telah bergabung ke sesi.`, "info");
+            } else {
+              console.log("No primary supervisor found in userOnlineMap");
+            }
+          } else {
+            console.log("No primary supervisor found in data.supervisors");
+          }
+        } else {
+          console.log("primary lecturer not joined the session (not found)");
+        }
+      } catch (err) {
+        console.log("Error handling event primary_lecturer_joined:", err);
       }
     });
 
@@ -74,28 +140,37 @@ export const useChatWebSocket = (
     // Recipients: Student & Primary Supervisor
     // ============================================
     on("secondary_lecturer_joined", (data: WebSocketEventData) => {
-      console.log("👤 secondary_lecturer_joined event:", data);
-
-      // Student pasti online
-      if (data.student_id) {
-        addOnlineParticipant(data.student_id);
-      }
-
-      // Primary pasti sudah join sebelumnya (dari data supervisors array)
-      if (data.supervisors && data.supervisors[0]?.id) {
-        addOnlineParticipant(data.supervisors[0].id);
-      }
-
-      // Secondary yang baru join
-      if (data.supervisors && data.supervisors[1]?.id) {
-        const secondaryId = data.supervisors[1].id;
-        const secondaryName = data.supervisors[1].name;
-        console.log(
-          "✅ Secondary lecturer is online (just joined):",
-          secondaryId
-        );
-        addOnlineParticipant(secondaryId);
-        showToast(`${secondaryName} telah bergabung ke sesi.`, "info");
+      try {
+        console.log("👤 secondary_lecturer_joined event:", data);
+        if (data.supervisors && data.supervisors.length > 0) {
+          const secondary = data.supervisors.find(
+            (s) => s.role === "secondary_lecturer"
+          );
+          if (secondary) {
+            console.log(
+              "✅ Secondary lecturer is online (just joined):",
+              secondary.name
+            );
+            if (!userOnlineMap.some((u) => u.id === secondary.id)) {
+              userOnlineMap.push({
+                id: secondary.id,
+                role: secondary.role,
+                name: secondary.name,
+                event: "secondary_lecturer_joined",
+              });
+              addOnlineParticipant(secondary.id);
+              showToast(`${secondary.name} telah bergabung ke sesi.`, "info");
+            } else {
+              console.log("No secondary supervisor found in userOnlineMap");
+            }
+          } else {
+            console.log("No secondary supervisor found in data.supervisors");
+          }
+        } else {
+          console.log("secondary lecturer not joined the session (not found)");
+        }
+      } catch (err) {
+        console.log("Error handling event secondary_lecturer_joined:", err);
       }
     });
 
@@ -105,22 +180,27 @@ export const useChatWebSocket = (
     // Recipients: Supervisors
     // ============================================
     on("student_joined", (data: WebSocketEventData) => {
-      console.log("👤 student_joined event:", data);
-
-      // Student yang baru join
-      if (data.student_id) {
-        console.log("✅ Student is online (just joined):", data.student_id);
-        addOnlineParticipant(data.student_id);
-        showToast(`${data.student_name} telah bergabung ke sesi.`, "info");
-      }
-
-      // Supervisors yang ada di array pasti sudah online (mereka yang start/sudah join)
-      if (data.supervisors) {
-        data.supervisors.forEach((supervisor) => {
-          if (supervisor.id) {
-            addOnlineParticipant(supervisor.id);
+      try {
+        console.log("👤 student_joined event:", data);
+        if (data.student_id) {
+          console.log("✅ Student is online (just joined):", data.student_name);
+          if (!userOnlineMap.some((u) => u.id === data.student_id)) {
+            userOnlineMap.push({
+              id: data.student_id,
+              role: "student",
+              name: data.student_name || "Unknown",
+              event: "student_joined",
+            });
+            addOnlineParticipant(data.student_id);
+            showToast(`${data.student_name} telah bergabung ke sesi.`, "info");
+          } else {
+            console.log("No student found in userOnlineMap");
           }
-        });
+        } else {
+          console.log("No student found in data.supervisors");
+        }
+      } catch (err) {
+        console.log("Error handling event student_joined:", err);
       }
     });
 
@@ -138,7 +218,7 @@ export const useChatWebSocket = (
       const messageData: Message = {
         id: data.id || "",
         event: data.event,
-        is_text: data.is_text || false,
+        is_text: data.is_text || true,
         text: data.text || "",
         file_url: data.file_url || null,
         file_type: data.file_type || null,
@@ -161,51 +241,23 @@ export const useChatWebSocket = (
     // Primary supervisor left
     // Recipients: Student & Secondary (if exists)
     // ============================================
-    on("primary_lecturer_leaved", (data: WebSocketEventData) => {
-      console.log("👋 primary_lecturer_leaved event:", data);
-
-      // Primary yang leave
-      if (data.supervisors && data.supervisors[0]?.id) {
-        const primaryId = data.supervisors[0].id;
-        const primaryName = data.supervisors[0].name;
-        console.log("❌ Primary lecturer left:", primaryId);
-        removeOnlineParticipant(primaryId);
-        showToast(`${primaryName} telah meninggalkan sesi.`, "warning");
-      }
-    });
+    on("primary_lecturer_leaved", () => handleUserLeave("primary_lecturer"));
 
     // ============================================
     // Event: secondary_lecturer_leaved
     // Secondary supervisor left
     // Recipients: Student & Primary
     // ============================================
-    on("secondary_lecturer_leaved", (data: WebSocketEventData) => {
-      console.log("👋 secondary_lecturer_leaved event:", data);
-
-      // Secondary yang leave (index 1)
-      if (data.supervisors && data.supervisors[1]?.id) {
-        const secondaryId = data.supervisors[1].id;
-        const secondaryName = data.supervisors[1].name;
-        console.log("❌ Secondary lecturer left:", secondaryId);
-        removeOnlineParticipant(secondaryId);
-        showToast(`${secondaryName} telah meninggalkan sesi.`, "warning");
-      }
-    });
+    on("secondary_lecturer_leaved", () =>
+      handleUserLeave("secondary_lecturer")
+    );
 
     // ============================================
     // Event: student_leaved
     // Student left
     // Recipients: Supervisors
     // ============================================
-    on("student_leaved", (data: WebSocketEventData) => {
-      console.log("👋 student_leaved event:", data);
-
-      if (data.student_id) {
-        console.log("❌ Student left:", data.student_id);
-        removeOnlineParticipant(data.student_id);
-        showToast(`${data.student_name} telah meninggalkan sesi.`, "warning");
-      }
-    });
+    on("student_leaved", () => handleUserLeave("student"));
 
     // ============================================
     // Event: user_ended
@@ -213,14 +265,30 @@ export const useChatWebSocket = (
     // Recipients: All participants
     // ============================================
     on("user_ended", (data: WebSocketEventData) => {
-      console.log("🔚 user_ended event:", data);
+      try {
+        console.log("🔚 user_ended event:", data);
+        const userOwner = userOnlineMap.find(
+          (u) => u.event === "session_started"
+        );
+        if (userOwner) {
+          console.log("❌ User ended:", userOwner.id);
+          // empty online participant
+          userOnlineMap.forEach((u) => {
+            removeOnlineParticipant(u.id);
+          });
+          // empty userOnlineMap
+          userOnlineMap = [];
+          showToast(`${userOwner.name} telah meninggalkan sesi.`, "warning");
+        } else {
+          console.log("No user owner found in userOnlineMap");
+        }
 
-      const enderName = data.student_name || "Pengguna";
-      showToast(`${enderName} telah mengakhiri sesi bimbingan.`, "info");
-
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 2000);
+        setTimeout(() => {
+          router.push("/dashboard");
+        }, 2000);
+      } catch (err) {
+        console.log("Error handling event user_ended:", err);
+      }
     });
 
     console.log("✅ All WebSocket listeners registered");

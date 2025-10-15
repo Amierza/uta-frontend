@@ -204,10 +204,6 @@ onMounted(async () => {
     }
   }
 
-  if (userId.value) {
-    addOnlineParticipant(userId.value);
-  }
-
   try {
     await fetchSessionDetail(sessionId);
     console.log("✅ Session detail loaded:", {

@@ -57,5 +57,5 @@ export interface WebSocketEventData {
   timestamp?: string;
   student_id?: string;
   student_name?: string;
-  supervisors?: Array<{ id: string; name?: string }>;
+  supervisors?: Array<{ id: string; role: string; name: string }>;
 }

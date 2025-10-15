@@ -233,17 +233,6 @@ export const useChatMessages = (
       return;
     }
 
-    // Remove temporary message if match found
-    const tempIndex = messages.value.findIndex(
-      (m) =>
-        m.is_sending && m.text === data.text && m.sender.id === data.sender.id
-    );
-
-    if (tempIndex !== -1) {
-      console.log("🔄 Replacing temp message with real message");
-      messages.value.splice(tempIndex, 1);
-    }
-
     // Add new message
     messages.value.push(data);
 
