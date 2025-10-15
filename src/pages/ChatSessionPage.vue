@@ -44,7 +44,7 @@ const toastWrapper = (
 
 // Chat Participants
 const {
-  // onlineParticipants,
+  onlineCount,
   allParticipants,
   otherParticipants,
   getSenderName,
@@ -129,14 +129,6 @@ const sessionStatus = computed<string>(() => {
 const replyToSenderName = computed<string>(() => {
   return replyingTo.value ? getSenderName(replyingTo.value) : "";
 });
-
-// Hitung participant yang benar-benar online
-const trueOnlineCount = computed<number>(() => {
-  // Count dari participants yang statusnya online
-  return allParticipants.value.filter((p) => p.online).length;
-});
-
-console.log("true online count: ", trueOnlineCount);
 
 const totalParticipantCount = computed<number>(() => {
   return allParticipants.value.length;
@@ -251,7 +243,7 @@ onUnmounted(() => {
       :session-status="sessionStatus"
       :other-participants="otherParticipants"
       :all-participants="allParticipants"
-      :online-count="trueOnlineCount"
+      :online-count="onlineCount"
       :total-count="totalParticipantCount"
       :user-type="userType"
       :is-session-owner="isSessionOwner"

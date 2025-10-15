@@ -176,6 +176,10 @@ export const useChatParticipants = (
     return message.sender.id === userId.value;
   };
 
+  const onlineCount = computed<number>(() => {
+    return onlineParticipants.value.size; // Menggunakan .size untuk mendapatkan jumlah peserta online
+  });
+
   const addOnlineParticipant = (participantId: string): void => {
     onlineParticipants.value.add(participantId);
   };
@@ -190,6 +194,7 @@ export const useChatParticipants = (
 
   return {
     onlineParticipants,
+    onlineCount,
     senderMap,
     allParticipants,
     otherParticipants,
