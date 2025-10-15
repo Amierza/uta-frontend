@@ -88,7 +88,7 @@ const { setupWebSocketListeners, resetWebSocket } = useChatWebSocket(
   toastWrapper
 );
 
-// ✅ PERBAIKAN 1: Check if current user is session owner
+// Check if current user is session owner
 const isSessionOwner = computed<boolean>(() => {
   return userId.value === sessionDetail.value?.user_owner?.id;
 });
@@ -128,7 +128,6 @@ const replyToSenderName = computed<string>(() => {
   return replyingTo.value ? getSenderName(replyingTo.value) : "";
 });
 
-// ✅ PERBAIKAN 2: Fix online count
 // Hitung participant yang benar-benar online
 const trueOnlineCount = computed<number>(() => {
   // Count dari participants yang statusnya online

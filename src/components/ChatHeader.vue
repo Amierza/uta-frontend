@@ -1,5 +1,4 @@
 <script setup lang="ts">
-// import { computed } from "vue";
 import { getInitials, getAvatarColor } from "../utils";
 import type { Participant } from "../types/message";
 
@@ -23,15 +22,6 @@ const emit = defineEmits<{
   leave: [];
   end: [];
 }>();
-
-// // ✅ Conditional button visibility
-// const showLeaveButton = computed(() => {
-//   return true; // Bisa leave jika sudah computed di parent
-// });
-
-// const showEndButton = computed(() => {
-//   return true; // Bisa end jika sudah computed di parent
-// });
 </script>
 
 <template>
@@ -84,7 +74,6 @@ const emit = defineEmits<{
               >
                 {{ sessionTitle }}
               </h3>
-              <!-- ✅ PERBAIKAN 2: Fix online count display -->
               <p class="text-xs text-gray-500 flex items-center space-x-1">
                 <span>{{ onlineCount }}/{{ totalCount }} peserta online</span>
                 <span>•</span>
@@ -95,8 +84,6 @@ const emit = defineEmits<{
         </div>
 
         <div class="flex items-center space-x-2 flex-shrink-0">
-          <!-- ✅ PERBAIKAN 1: Conditional leave/end buttons -->
-          <!-- Leave button - hanya bisa jika bukan owner -->
           <button
             v-if="canLeave"
             @click="emit('leave')"
@@ -106,7 +93,6 @@ const emit = defineEmits<{
             Tinggalkan
           </button>
 
-          <!-- End button - hanya owner yang bisa end -->
           <button
             v-if="canEnd"
             @click="emit('end')"
@@ -116,7 +102,6 @@ const emit = defineEmits<{
             Akhiri Sesi
           </button>
 
-          <!-- Show badge jika session owner -->
           <div
             v-if="isSessionOwner"
             class="hidden sm:flex px-2 py-1 text-xs font-semibold text-blue-700 bg-blue-100 rounded-lg"

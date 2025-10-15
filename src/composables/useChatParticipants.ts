@@ -85,7 +85,7 @@ export const useChatParticipants = (
             id: s.id,
             name: s.name,
             identifier: s.identifier,
-            role: s.role as "primary_supervisor" | "secondary_supervisor",
+            role: s.role,
             online: onlineParticipants.value.has(s.id),
           });
         }

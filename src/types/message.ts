@@ -36,7 +36,7 @@ export interface Participant {
   id: string;
   name: string;
   identifier: string;
-  role: "student" | "primary_supervisor" | "secondary_supervisor";
+  role: string;
   online: boolean;
 }
 
@@ -56,5 +56,6 @@ export interface WebSocketEventData {
   parent_message_id?: string | null;
   timestamp?: string;
   student_id?: string;
+  student_name?: string;
   supervisors?: Array<{ id: string; name?: string }>;
 }
