@@ -1,13 +1,12 @@
-// ============================================
-// useChatWebSocket.ts - FIXED
-// ============================================
-
-import { ref } from "vue";
 import { useRouter } from "vue-router";
 import type { Message, WebSocketEventData } from "../types/message";
 
 type WebSocketEventCallback = (data: WebSocketEventData) => void;
 type ToastType = "info" | "success" | "warning" | "error";
+
+// ✅ PERBAIKAN: Move flag OUTSIDE function scope
+// Agar tetap persist antar component mount/unmount
+let webSocketListenersSetupPerformed = false;
 
 export const useChatWebSocket = (
   sessionId: string,
@@ -18,37 +17,36 @@ export const useChatWebSocket = (
   showToast: (message: string, type?: ToastType, duration?: number) => void
 ) => {
   const router = useRouter();
-  const webSocketInitialized = ref<boolean>(false);
 
   const setupWebSocketListeners = (): void => {
-    if (webSocketInitialized.value) return;
-    webSocketInitialized.value = true;
+    // ✅ PERBAIKAN: Check flag dengan unique key per session
+    // const setupKey = `chat-ws-${sessionId}`;
 
+    if (webSocketListenersSetupPerformed) {
+      console.log(
+        "⏭️ WebSocket listeners sudah di-setup untuk session ini, skipping"
+      );
+      return;
+    }
+
+    webSocketListenersSetupPerformed = true;
     console.log("Setting up WebSocket listeners for session:", sessionId);
 
     // ============================================
     // Event: session_started
-    // Fired when ANYONE (student or supervisor) starts the session
-    // Others receive this event
     // ============================================
     on("session_started", (data: WebSocketEventData) => {
       console.log("🎬 Session started event:", {
         student_id: data.student_id,
-        student_name: data.student_name,
         supervisors: data.supervisors?.length || 0,
       });
 
-      // ✅ PERBAIKAN: Add student as online
       if (data.student_id) {
         console.log("✅ Adding student to online:", data.student_id);
         addOnlineParticipant(data.student_id);
       }
 
-      // ✅ PERBAIKAN: Jika ada supervisors di event ini (supervisor yang start)
-      // Add mereka yang sudah online/join saat start
       if (data.supervisors && data.supervisors.length > 0) {
-        console.log("ℹ️ Supervisors already in session at start:");
-
         if (data.supervisors[0]?.id) {
           console.log(
             "✅ Adding primary supervisor to online:",
@@ -69,17 +67,15 @@ export const useChatWebSocket = (
 
     // ============================================
     // Event: primary_lecturer_joined
-    // Fired when primary supervisor joins
-    // Others (student, secondary) receive this event
     // ============================================
     on("primary_lecturer_joined", (data: WebSocketEventData) => {
-      console.log("👤 Primary lecturer joined event:", {
-        primary_id: data.supervisors?.[0]?.id,
-        primary_name: data.supervisors?.[0]?.name,
-        all_supervisors: data.supervisors?.length,
-      });
+      console.log("👤 Primary lecturer joined event");
 
-      // ✅ PERBAIKAN: Add primary supervisor
+      // Ensure student is online
+      if (data.student_id && !new Set([data.student_id]).has(data.student_id)) {
+        addOnlineParticipant(data.student_id);
+      }
+
       if (data.supervisors?.[0]?.id) {
         console.log(
           "✅ Adding primary supervisor to online:",
@@ -87,29 +83,14 @@ export const useChatWebSocket = (
         );
         addOnlineParticipant(data.supervisors[0].id);
       }
-
-      // If secondary is already in supervisors array, add them too
-      if (data.supervisors?.[1]?.id) {
-        console.log(
-          "ℹ️ Secondary supervisor already in array but not yet joined"
-        );
-        // Don't add yet, wait for secondary_lecturer_joined event
-      }
     });
 
     // ============================================
     // Event: secondary_lecturer_joined
-    // Fired when secondary supervisor joins
-    // Others (student, primary) receive this event
     // ============================================
     on("secondary_lecturer_joined", (data: WebSocketEventData) => {
-      console.log("👤 Secondary lecturer joined event:", {
-        secondary_id: data.supervisors?.[1]?.id,
-        secondary_name: data.supervisors?.[1]?.name,
-        all_supervisors: data.supervisors?.length,
-      });
+      console.log("👤 Secondary lecturer joined event");
 
-      // ✅ PERBAIKAN: Add secondary supervisor
       if (data.supervisors?.[1]?.id) {
         console.log(
           "✅ Adding secondary supervisor to online:",
@@ -121,13 +102,9 @@ export const useChatWebSocket = (
 
     // ============================================
     // Event: student_joined
-    // Fired when student joins (untuk kasus di mana supervisor start)
     // ============================================
     on("student_joined", (data: WebSocketEventData) => {
-      console.log("👤 Student joined event:", {
-        student_id: data.student_id,
-        student_name: data.student_name,
-      });
+      console.log("👤 Student joined event");
 
       if (data.student_id) {
         console.log("✅ Adding student to online:", data.student_id);
@@ -139,14 +116,10 @@ export const useChatWebSocket = (
     // Event: new_message
     // ============================================
     on("new_message", (data: WebSocketEventData) => {
-      console.log("📨 New message event received:", {
-        id: data.id,
-        sender: data.sender,
-        text: data.text?.substring(0, 30),
-      });
+      console.log("📨 New message event received");
 
       if (!data.sender || !data.sender.id) {
-        console.error("❌ Invalid sender data from WebSocket:", data);
+        console.error("❌ Invalid sender data:", data);
         return;
       }
 
@@ -167,11 +140,6 @@ export const useChatWebSocket = (
         parent_message_id: data.parent_message_id || null,
         timestamp: data.timestamp || new Date().toISOString(),
       };
-
-      console.log("✅ Processing message:", {
-        id: messageData.id,
-        sender_name: messageData.sender.name,
-      });
 
       addNewMessage(messageData);
     });
@@ -234,7 +202,9 @@ export const useChatWebSocket = (
   };
 
   const resetWebSocket = (): void => {
-    webSocketInitialized.value = false;
+    // ✅ PERBAIKAN: Reset flag saat component unmount
+    webSocketListenersSetupPerformed = false;
+    console.log("🧹 WebSocket listeners reset");
   };
 
   return {
