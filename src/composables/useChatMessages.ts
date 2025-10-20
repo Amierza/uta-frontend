@@ -59,14 +59,6 @@ export const useChatMessages = (
         );
 
         const messagesData = response.data.map((msg: any) => {
-          console.log("🔄 Mapping message:", {
-            id: msg.id,
-            sender_id: msg.sender_id,
-            sender_name: msg.sender_name,
-            text: msg.text?.substring(0, 30),
-          });
-
-          // PERBAIKAN: Pastikan sender object dibuat dengan benar
           const sender: CustomUserResponse = {
             id: msg.sender.id || "",
             name: msg.sender.name || "Unknown",
@@ -97,21 +89,6 @@ export const useChatMessages = (
         );
 
         console.log("✅ Messages loaded and sorted:", messages.value.length);
-
-        // Debug: Log sender information
-        if (messages.value.length > 0) {
-          console.log("📝 First message sender:", {
-            id: messages.value[0].sender.id,
-            name: messages.value[0].sender.name,
-            identifier: messages.value[0].sender.identifier,
-          });
-          console.log("📝 Last message sender:", {
-            id: messages.value[messages.value.length - 1].sender.id,
-            name: messages.value[messages.value.length - 1].sender.name,
-            identifier:
-              messages.value[messages.value.length - 1].sender.identifier,
-          });
-        }
 
         // Scroll after render
         nextTick(() => {

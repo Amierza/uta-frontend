@@ -75,7 +75,6 @@ const emit = defineEmits<{
                 {{ sessionTitle }}
               </h3>
               <p class="text-xs text-gray-500 flex items-center space-x-1">
-                <span>{{ onlineCount }}/{{ totalCount }} peserta online</span>
                 <span>•</span>
                 <span class="capitalize">{{ sessionStatus }}</span>
               </p>
