@@ -131,27 +131,18 @@ const setupWebSocketListeners = () => {
   on("primary_lecturer_joined", (data: any) => {
     console.log("📢 [WS] primary_lecturer_joined:", data);
     fetchSessions();
-
-    const lecturerName = data.supervisors?.[0]?.name || "Dosen pembimbing";
-    showToast(`${lecturerName} telah bergabung`, "info");
   });
 
   // Event: Secondary lecturer joined
   on("secondary_lecturer_joined", (data: any) => {
     console.log("📢 [WS] secondary_lecturer_joined:", data);
     fetchSessions();
-
-    const lecturerName = data.supervisors?.[1]?.name || "Dosen pembimbing";
-    showToast(`${lecturerName} telah bergabung`, "info");
   });
 
   // Event: Student joined
   on("student_joined", (data: any) => {
     console.log("📢 [WS] student_joined:", data);
     fetchSessions();
-
-    const studentName = data.student_name || "Mahasiswa";
-    showToast(`${studentName} bergabung ke sesi`, "info");
   });
 
   // Event: Session ended
@@ -165,26 +156,17 @@ const setupWebSocketListeners = () => {
   on("primary_lecturer_leaved", (data: any) => {
     console.log("📢 [WS] primary_lecturer_leaved:", data);
     fetchSessions();
-
-    const lecturerName = data.supervisors?.[0]?.name || "Dosen pembimbing";
-    showToast(`${lecturerName} telah meninggalkan sesi`, "warning");
   });
 
   on("secondary_lecturer_leaved", (data: any) => {
     console.log("📢 [WS] secondary_lecturer_leaved:", data);
     fetchSessions();
-
-    const lecturerName = data.supervisors?.[1]?.name || "Dosen pembimbing";
-    showToast(`${lecturerName} telah meninggalkan sesi`, "warning");
   });
 
   // Event: Student left
   on("student_leaved", (data: any) => {
     console.log("📢 [WS] student_leaved:", data);
     fetchSessions();
-
-    const studentName = data.student_name || "Mahasiswa";
-    showToast(`${studentName} telah meninggalkan sesi`, "warning");
   });
 
   console.log("✅ All WebSocket listeners registered for Dashboard");
@@ -362,31 +344,6 @@ onUnmounted(() => {
     <main
       class="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8"
     >
-      <!-- Refresh Button (Mobile) -->
-      <div class="flex justify-end mb-4 lg:hidden">
-        <button
-          @click="refreshData"
-          :disabled="isRefreshing"
-          class="flex items-center space-x-2 px-4 py-2 bg-white rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50"
-        >
-          <svg
-            :class="{ 'animate-spin': isRefreshing }"
-            class="w-5 h-5 text-blue-600"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
-          <span class="text-sm font-medium text-gray-700">Refresh</span>
-        </button>
-      </div>
-
       <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
         <!-- Left Column - Profile, Progress & Quick Actions -->
         <div class="lg:col-span-4 space-y-4 sm:space-y-6">

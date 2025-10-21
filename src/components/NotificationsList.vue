@@ -46,9 +46,10 @@ const unreadCount = computed(() => {
       </button>
     </h3>
 
-    <div v-if="isLoading" class="text-center py-8">
+    <!-- Loading State -->
+    <div v-if="isLoading" class="text-center py-12">
       <div
-        class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"
+        class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-gray-200 border-t-blue-600"
       ></div>
       <p class="text-sm text-gray-500 mt-2">Memuat notifikasi...</p>
     </div>
