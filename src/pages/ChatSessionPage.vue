@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, computed } from "vue";
+import { ref, onMounted, onUnmounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useUser } from "../composables/useUser";
 import { useSessions } from "../composables/useSession";
@@ -19,10 +19,12 @@ import ChatHeader from "../components/ChatHeader.vue";
 import MessageBubble from "../components/MessageBubble.vue";
 import MessageInput from "../components/MessageInput.vue";
 import ToastNotification from "../components/ToastNotification.vue";
+import SessionEndingScreen from "../components/SessionEndingScreen.vue";
 
 const route = useRoute();
 const router = useRouter();
 const sessionId = route.params.session_id as string;
+const isProcessingEnd = ref(false);
 
 // Composables
 const { userId, userType, userName, userIdentifier, fetchUserProfile } =
@@ -38,9 +40,10 @@ const { show: showToast } = useNotificationToast();
 // Wrap showToast
 const toastWrapper = (
   message: string,
-  type?: "info" | "success" | "warning" | "error"
+  type?: "info" | "success" | "warning" | "error",
+  duration: number = 3000
 ) => {
-  showToast(message, type);
+  showToast(message, type, duration);
 };
 
 // Chat Participants
@@ -149,16 +152,36 @@ const handleLeaveSession = async (): Promise<void> => {
 };
 
 const handleEndSession = async (): Promise<void> => {
-  if (confirm("Apakah Anda yakin ingin mengakhiri sesi ini?")) {
+  if (
+    confirm(
+      "Apakah Anda yakin ingin mengakhiri sesi ini? AI akan memproses ringkasan percakapan."
+    )
+  ) {
     try {
-      await endSessionApi(sessionId);
-      setTimeout(() => {
-        router.push("/dashboard");
-      }, 1500);
+      // Show processing screen
+      isProcessingEnd.value = true;
+
+      // Call API to end session
+      const response = await endSessionApi(sessionId);
+
+      console.log("✅ Session ended:", response);
+
+      // Processing screen will handle the redirect
     } catch (error: any) {
       console.error("Failed to end session:", error);
+      isProcessingEnd.value = false;
+      toastWrapper("Gagal mengakhiri sesi.", "error");
     }
   }
+};
+
+const handleProcessingComplete = () => {
+  // Redirect to dashboard dengan toast
+  toastWrapper(
+    "Sesi berhasil diakhiri. AI sedang memproses ringkasan percakapan.",
+    "success"
+  );
+  router.push("/dashboard");
 };
 
 // Lifecycle
@@ -208,8 +231,16 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Processing Screen Overlay -->
+  <SessionEndingScreen
+    v-if="isProcessingEnd"
+    :session-title="sessionTitle"
+    @complete="handleProcessingComplete"
+  />
+
   <!-- Toast Notifications -->
   <ToastNotification />
+
   <div
     class="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"
   >
