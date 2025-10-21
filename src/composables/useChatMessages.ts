@@ -25,8 +25,26 @@ export const useChatMessages = (
   const groupedMessages = computed<GroupedMessages>(() => {
     const groups: GroupedMessages = {};
 
+    // Tambahkan validasi untuk memastikan messages ada dan valid
+    if (!messages.value || messages.value.length === 0) {
+      return groups;
+    }
+
     messages.value.forEach((msg) => {
+      // Validasi timestamp sebelum format
+      if (!msg.timestamp) {
+        console.warn("Message without timestamp:", msg);
+        return; // Skip message ini
+      }
+
       const dateKey = formatDate(msg.timestamp);
+
+      // Skip jika formatDate gagal
+      if (dateKey === "Invalid Date") {
+        console.warn("Invalid date for message:", msg);
+        return;
+      }
+
       if (!groups[dateKey]) {
         groups[dateKey] = [];
       }

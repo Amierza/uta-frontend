@@ -271,6 +271,20 @@ onUnmounted(() => {
       ref="chatContainer"
       class="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 chat-background"
     >
+      <!-- Tambahkan loading state ketika messages sedang dimuat -->
+      <div
+        v-if="isLoadingMessages"
+        class="flex items-center justify-center h-full"
+      >
+        <div class="text-center">
+          <div
+            class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-200 border-t-blue-600"
+          ></div>
+          <p class="text-sm text-gray-500 mt-2">Memuat pesan...</p>
+        </div>
+      </div>
+
+      <!-- Chat messages -->
       <div class="max-w-4xl mx-auto space-y-4">
         <div v-if="messages.length === 0" class="text-center py-16">
           <div

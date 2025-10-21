@@ -23,34 +23,78 @@ export const getAvatarColor = (name: string): string => {
   return colors[index];
 };
 
-export const formatTime = (timestamp: string): string => {
-  const date = new Date(timestamp);
-  if (isNaN(date.getTime())) {
-    console.warn("Invalid timestamp:", timestamp);
-    return "Invalid";
-  }
-  return date.toLocaleTimeString("id-ID", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
-export const formatDate = (timestamp: string): string => {
+// Parse PostgreSQL timestamp format to JavaScript Date
+const parseTimestamp = (timestamp: string): Date | null => {
   try {
-    const date = new Date(timestamp);
+    // Format dari backend: "2025-10-21 07:50:24.26913 +0700 WIB"
+    // Kita perlu convert ke format yang valid untuk JavaScript
+
+    // Remove timezone name (WIB, WITA, WIT, dll)
+    let cleaned = timestamp.replace(/\s+(WIB|WITA|WIT)$/i, "").trim();
+
+    // Replace first space (between date and time) with 'T'
+    // "2025-10-21 07:50:24.26913 +0700" -> "2025-10-21T07:50:24.26913 +0700"
+    cleaned = cleaned.replace(" ", "T");
+
+    // Remove space before timezone offset
+    // "2025-10-21T07:50:24.26913 +0700" -> "2025-10-21T07:50:24.26913+0700"
+    cleaned = cleaned.replace(/\s+([+-])/, "$1");
+
+    // Add colon to timezone offset
+    // "2025-10-21T07:50:24.26913+0700" -> "2025-10-21T07:50:24.26913+07:00"
+    cleaned = cleaned.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+
+    const date = new Date(cleaned);
 
     if (isNaN(date.getTime())) {
-      console.warn("Invalid timestamp:", timestamp);
-      return "Invalid Date";
+      console.warn("Failed to parse timestamp:", timestamp);
+      return null;
+    }
+
+    return date;
+  } catch (error) {
+    console.error("Error parsing timestamp:", timestamp, error);
+    return null;
+  }
+};
+
+export const formatDate = (timestamp: string | null | undefined): string => {
+  try {
+    if (!timestamp || timestamp === "") {
+      console.warn("Empty or null timestamp");
+      return "Tanggal Tidak Tersedia";
+    }
+
+    const date = parseTimestamp(timestamp);
+
+    if (!date) {
+      return "Tanggal Tidak Valid";
     }
 
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) {
+    // Reset time untuk perbandingan tanggal saja
+    const compareToday = new Date(
+      today.getFullYear(),
+      today.getMonth(),
+      today.getDate()
+    );
+    const compareYesterday = new Date(
+      yesterday.getFullYear(),
+      yesterday.getMonth(),
+      yesterday.getDate()
+    );
+    const compareDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate()
+    );
+
+    if (compareDate.getTime() === compareToday.getTime()) {
       return "Hari Ini";
-    } else if (date.toDateString() === yesterday.toDateString()) {
+    } else if (compareDate.getTime() === compareYesterday.getTime()) {
       return "Kemarin";
     } else {
       return date.toLocaleDateString("id-ID", {
@@ -61,6 +105,29 @@ export const formatDate = (timestamp: string): string => {
     }
   } catch (error) {
     console.error("Error formatting date:", timestamp, error);
-    return "Invalid Date";
+    return "Tanggal Tidak Valid";
+  }
+};
+
+export const formatTime = (timestamp: string | null | undefined): string => {
+  try {
+    if (!timestamp || timestamp === "") {
+      console.warn("Empty or null timestamp");
+      return "--:--";
+    }
+
+    const date = parseTimestamp(timestamp);
+
+    if (!date) {
+      return "--:--";
+    }
+
+    return date.toLocaleTimeString("id-ID", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (error) {
+    console.error("Error formatting time:", timestamp, error);
+    return "--:--";
   }
 };
