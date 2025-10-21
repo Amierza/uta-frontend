@@ -1,8 +1,15 @@
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import type { Message, WebSocketEventData } from "../types/message";
 
 type WebSocketEventCallback = (data: WebSocketEventData) => void;
 type ToastType = "info" | "success" | "warning" | "error";
+interface OnlineUser {
+  id: string;
+  role: string;
+  name: string;
+  event: string;
+}
 
 let webSocketListenersSetupPerformed = false;
 
@@ -15,6 +22,7 @@ export const useChatWebSocket = (
   showToast: (message: string, type?: ToastType, duration?: number) => void
 ) => {
   const router = useRouter();
+  const userOnlineMap = ref<OnlineUser[]>([]);
 
   const setupWebSocketListeners = (): void => {
     if (webSocketListenersSetupPerformed) {
@@ -25,18 +33,13 @@ export const useChatWebSocket = (
     webSocketListenersSetupPerformed = true;
     console.log("🔌 Setting up WebSocket listeners for session:", sessionId);
 
-    let userOnlineMap: {
-      id: string;
-      role: string;
-      name: string;
-      event: string;
-    }[] = [];
-
     const handleUserLeave = (role: string) => {
-      const user = userOnlineMap.find((u) => u.role === role);
+      const user = userOnlineMap.value.find((u) => u.role === role);
       if (user) {
         console.log(`❌ ${user.role} left:`, user.id);
-        userOnlineMap = userOnlineMap.filter((u) => u.id !== user.id);
+        userOnlineMap.value = userOnlineMap.value.filter(
+          (u) => u.id !== user.id
+        );
         removeOnlineParticipant(user.id);
         showToast(`${user.name} telah meninggalkan sesi.`, "warning");
       } else {
@@ -56,7 +59,7 @@ export const useChatWebSocket = (
               "✅ Student is online (started session):",
               data.student_id
             );
-            userOnlineMap.push({
+            userOnlineMap.value.push({
               id: data.student_id,
               role: "student",
               name: data.student_name || "Unknown",
@@ -74,7 +77,7 @@ export const useChatWebSocket = (
               "✅ Supervisors is online (started session):",
               data.supervisors[0].name
             );
-            userOnlineMap.push({
+            userOnlineMap.value.push({
               id: data.supervisors[0].id,
               role: data.supervisors[0].role,
               name: data.supervisors[0].name,
@@ -111,8 +114,8 @@ export const useChatWebSocket = (
               "✅ Primary lecturer is online (just joined):",
               primary.name
             );
-            if (!userOnlineMap.some((u) => u.id === primary.id)) {
-              userOnlineMap.push({
+            if (!userOnlineMap.value.some((u) => u.id === primary.id)) {
+              userOnlineMap.value.push({
                 id: primary.id,
                 role: primary.role,
                 name: primary.name,
@@ -151,8 +154,8 @@ export const useChatWebSocket = (
               "✅ Secondary lecturer is online (just joined):",
               secondary.name
             );
-            if (!userOnlineMap.some((u) => u.id === secondary.id)) {
-              userOnlineMap.push({
+            if (!userOnlineMap.value.some((u) => u.id === secondary.id)) {
+              userOnlineMap.value.push({
                 id: secondary.id,
                 role: secondary.role,
                 name: secondary.name,
@@ -184,8 +187,8 @@ export const useChatWebSocket = (
         console.log("👤 student_joined event:", data);
         if (data.student_id) {
           console.log("✅ Student is online (just joined):", data.student_name);
-          if (!userOnlineMap.some((u) => u.id === data.student_id)) {
-            userOnlineMap.push({
+          if (!userOnlineMap.value.some((u) => u.id === data.student_id)) {
+            userOnlineMap.value.push({
               id: data.student_id,
               role: "student",
               name: data.student_name || "Unknown",
@@ -267,17 +270,17 @@ export const useChatWebSocket = (
     on("user_ended", (data: WebSocketEventData) => {
       try {
         console.log("🔚 user_ended event:", data);
-        const userOwner = userOnlineMap.find(
+        const userOwner = userOnlineMap.value.find(
           (u) => u.event === "session_started"
         );
         if (userOwner) {
           console.log("❌ User ended:", userOwner.id);
           // empty online participant
-          userOnlineMap.forEach((u) => {
+          userOnlineMap.value.forEach((u) => {
             removeOnlineParticipant(u.id);
           });
           // empty userOnlineMap
-          userOnlineMap = [];
+          userOnlineMap.value = [];
           showToast(`${userOwner.name} telah meninggalkan sesi.`, "warning");
         } else {
           console.log("No user owner found in userOnlineMap");

@@ -18,6 +18,7 @@ import type { Message } from "../types/message";
 import ChatHeader from "../components/ChatHeader.vue";
 import MessageBubble from "../components/MessageBubble.vue";
 import MessageInput from "../components/MessageInput.vue";
+import ToastNotification from "../components/ToastNotification.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -46,15 +47,12 @@ const toastWrapper = (
 const {
   onlineCount,
   allParticipants,
-  otherParticipants,
   getSenderName,
   isMyMessage,
   addOnlineParticipant,
   removeOnlineParticipant,
   clearOnlineParticipants,
 } = useChatParticipants(sessionDetail, userId);
-
-console.log("all participants", allParticipants);
 
 // Chat Messages
 const {
@@ -71,14 +69,7 @@ const {
   setReplyTo,
   cancelReply,
   scrollToBottom,
-} = useChatMessages(
-  sessionId,
-  userId,
-  userName,
-  userIdentifier,
-  userType,
-  toastWrapper
-);
+} = useChatMessages(sessionId, userId, userName, userIdentifier, userType);
 
 // WebSocket Setup
 const { setupWebSocketListeners, resetWebSocket } = useChatWebSocket(
@@ -150,14 +141,9 @@ const handleLeaveSession = async (): Promise<void> => {
   if (confirm("Apakah Anda yakin ingin meninggalkan sesi ini?")) {
     try {
       await leaveSessionApi(sessionId);
-      toastWrapper("Anda telah meninggalkan sesi.", "success");
       router.push("/dashboard");
     } catch (error: any) {
       console.error("Failed to leave session:", error);
-      toastWrapper(
-        error.response?.data?.message || "Gagal meninggalkan sesi.",
-        "error"
-      );
     }
   }
 };
@@ -166,16 +152,11 @@ const handleEndSession = async (): Promise<void> => {
   if (confirm("Apakah Anda yakin ingin mengakhiri sesi ini?")) {
     try {
       await endSessionApi(sessionId);
-      toastWrapper("Sesi bimbingan telah diakhiri.", "success");
       setTimeout(() => {
         router.push("/dashboard");
       }, 1500);
     } catch (error: any) {
       console.error("Failed to end session:", error);
-      toastWrapper(
-        error.response?.data?.message || "Gagal mengakhiri sesi.",
-        "error"
-      );
     }
   }
 };
@@ -193,7 +174,6 @@ onMounted(async () => {
     });
   } catch (error) {
     console.error("Failed to load user profile:", error);
-    toastWrapper("Gagal memuat data pengguna.", "error");
     return;
   }
 
@@ -212,12 +192,10 @@ onMounted(async () => {
     });
   } catch (error) {
     console.error("Failed to load session detail:", error);
-    toastWrapper("Gagal memuat detail sesi.", "error");
     return;
   }
 
   await fetchMessages();
-  console.log("✅ Messages loaded");
 
   setupWebSocketListeners();
   scrollToBottom();
@@ -230,6 +208,8 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <!-- Toast Notifications -->
+  <ToastNotification />
   <div
     class="flex flex-col h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50"
   >
@@ -237,7 +217,6 @@ onUnmounted(() => {
     <ChatHeader
       :session-title="sessionTitle"
       :session-status="sessionStatus"
-      :other-participants="otherParticipants"
       :all-participants="allParticipants"
       :online-count="onlineCount"
       :total-count="totalParticipantCount"

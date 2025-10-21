@@ -6,9 +6,7 @@ import type { Participant } from "../types/message";
 interface Props {
   sessionTitle: string;
   sessionStatus: string;
-  otherParticipants: Participant[];
   allParticipants: Participant[];
-  onlineCount: number;
   totalCount: number;
   userType: string;
   isSessionOwner: boolean;
@@ -75,21 +73,28 @@ const handleEnd = () => {
 
           <!-- Session Info -->
           <div class="flex items-center space-x-3 min-w-0 flex-1">
-            <!-- Avatars -->
+            <!-- Avatars - Show up to 3 participants -->
             <div class="relative flex-shrink-0 flex -space-x-2">
               <div
-                v-for="(participant, idx) in otherParticipants.slice(0, 2)"
-                :key="idx"
-                class="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-white flex items-center justify-center shadow-md relative"
+                v-for="participant in allParticipants.slice(0, 3)"
+                :key="participant.id"
+                class="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-white flex items-center justify-center shadow-md"
                 :class="getAvatarColor(participant.name)"
+                :title="participant.name"
               >
                 <span class="text-white font-semibold text-xs sm:text-sm">
                   {{ getInitials(participant.name) }}
                 </span>
-                <div
-                  v-if="participant.online"
-                  class="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"
-                ></div>
+              </div>
+              <!-- Show +N if more than 3 -->
+              <div
+                v-if="allParticipants.length > 3"
+                class="w-9 h-9 sm:w-10 sm:h-10 rounded-full border-2 border-white flex items-center justify-center shadow-md bg-gray-200"
+                :title="`+${allParticipants.length - 3} lainnya`"
+              >
+                <span class="text-gray-700 font-semibold text-xs">
+                  +{{ allParticipants.length - 3 }}
+                </span>
               </div>
             </div>
 
@@ -101,7 +106,15 @@ const handleEnd = () => {
                 {{ sessionTitle }}
               </h3>
               <p class="text-xs text-gray-500 flex items-center space-x-1">
-                <span class="capitalize">{{ sessionStatus }}</span>
+                <span>{{ totalCount }} peserta</span>
+                <span>•</span>
+                <span class="capitalize flex items-center space-x-1">
+                  <span
+                    v-if="sessionStatus === 'ongoing'"
+                    class="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"
+                  ></span>
+                  <span>{{ sessionStatus }}</span>
+                </span>
               </p>
             </div>
           </div>

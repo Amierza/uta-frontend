@@ -5,15 +5,12 @@ import type { Message, GroupedMessages } from "../types/message";
 import type { SendMessageRequest } from "../types/message";
 import type { CustomUserResponse } from "../types/user";
 
-type ToastType = "info" | "success" | "warning" | "error";
-
 export const useChatMessages = (
   sessionId: string,
   userId: Ref<string>,
   userName: Ref<string>,
   userIdentifier: Ref<string>,
-  userType: Ref<string>,
-  showToast: (message: string, type?: ToastType, duration?: number) => void
+  userType: Ref<string>
 ) => {
   const messages = ref<Message[]>([]);
   const newMessage = ref<string>("");
@@ -118,7 +115,6 @@ export const useChatMessages = (
       }
     } catch (error) {
       console.error("❌ Error fetching messages:", error);
-      showToast("Gagal memuat pesan", "error");
     } finally {
       isLoadingMessages.value = false;
     }
@@ -197,11 +193,6 @@ export const useChatMessages = (
         messages.value.splice(tempIndex, 1);
       }
 
-      showToast(
-        error.response?.data?.message ||
-          "Gagal mengirim pesan. Silakan coba lagi.",
-        "error"
-      );
       newMessage.value = messageText;
     } finally {
       isSending.value = false;

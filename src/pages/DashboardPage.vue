@@ -13,7 +13,6 @@ import { useWebSocket } from "../composables/useWebsocket";
 import DashboardHeader from "../components/DashboardHeader.vue";
 import WelcomeCard from "../components/WelcomeCard.vue";
 import ProgressCard from "../components/ProgressCard.vue";
-import QuickActions from "../components/QuickActions.vue";
 import NotificationsList from "../components/NotificationsList.vue";
 import RecentSessions from "../components/RecentSessions.vue";
 import ToastNotification from "../components/ToastNotification.vue";
@@ -47,9 +46,8 @@ const {
   joinActiveSession,
 } = useSessions(userId, userType, userIdentifier);
 
-const toastNotifications = ref([]); // Menyimpan notifikasi toast
-const { show: showToast } = useNotificationToast(); // Mengambil fungsi untuk menampilkan toast
-const { connect, on, isConnected } = useWebSocket();
+const { show: showToast } = useNotificationToast();
+const { connect, on, isConnected, disconnect } = useWebSocket();
 
 // State
 const progressData = ref({
@@ -63,28 +61,20 @@ const progressData = ref({
   },
 });
 
-// Handlers
-const handleQuickAction = (action: string) => {
-  const routes: Record<string, string> = {
-    chat: "/chat",
-    progress: "/progress",
-    upload: "/documents",
-    schedule: "/schedule",
-    students: "/students",
-    review: "/review",
-    summaries: "/summaries",
-  };
+const isRefreshing = ref(false);
+const webSocketReconnectAttempts = ref(0);
+const maxReconnectAttempts = 5;
 
-  const route = routes[action];
-  if (route) router.push(route);
-};
+// WebSocket state tracker
+let webSocketListenersSetup = false;
 
 const handleSessionClick = async (sessionId: string) => {
   try {
+    console.log("🔗 Joining session:", sessionId);
     await joinActiveSession(sessionId);
     router.push(`/session/${sessionId}`);
   } catch (error: any) {
-    console.error("Failed to join session:", error);
+    console.error("❌ Failed to join session:", error);
     showToast(
       error.message || "Gagal bergabung ke sesi. Silakan coba lagi.",
       "error"
@@ -94,12 +84,13 @@ const handleSessionClick = async (sessionId: string) => {
 
 const handleNewSession = async () => {
   if (!userThesisId.value) {
-    console.error("Thesis ID not found");
+    console.error("❌ Thesis ID not found");
     showToast("Thesis ID tidak ditemukan. Silakan hubungi admin.", "error");
     return;
   }
 
   try {
+    console.log("🚀 Starting new session for thesis:", userThesisId.value);
     const sessionData = await startSession(userThesisId.value);
 
     if (sessionData && sessionData.id) {
@@ -109,7 +100,7 @@ const handleNewSession = async () => {
       throw new Error("Session ID tidak ditemukan dalam response");
     }
   } catch (error: any) {
-    console.error("Failed to start session:", error);
+    console.error("❌ Failed to start session:", error);
     showToast(
       error.message || "Gagal memulai sesi bimbingan. Silakan coba lagi.",
       "error"
@@ -117,125 +108,230 @@ const handleNewSession = async () => {
   }
 };
 
-// WebSocket listeners setup
-let webSocketListenersSetup = false;
-
+// WebSocket setup
 const setupWebSocketListeners = () => {
   if (webSocketListenersSetup) {
-    console.log("✅ WebSocket listeners sudah di-setup");
+    console.log("⏭️ WebSocket listeners already setup, skipping");
     return;
   }
 
   webSocketListenersSetup = true;
-  console.log("🔌 Setting up WebSocket listeners di Dashboard");
+  console.log("🔌 Setting up WebSocket listeners for Dashboard");
 
-  // Event: Session dimulai oleh mahasiswa
+  // Event: Session started
   on("session_started", (data: any) => {
-    console.log("📢 EVENT: session_started", data);
-    // Auto-refresh sessions
+    console.log("📢 [WS] session_started:", data);
     fetchSessions();
-    // Show notification
-    showToast(`${data.student_name} memulai sesi bimbingan`, "info");
+
+    const studentName = data.student_name || "Mahasiswa";
+    showToast(`${studentName} memulai sesi bimbingan`, "info");
   });
 
-  // Event: Primary lecturer join
+  // Event: Primary lecturer joined
   on("primary_lecturer_joined", (data: any) => {
-    console.log("📢 EVENT: primary_lecturer_joined", data);
+    console.log("📢 [WS] primary_lecturer_joined:", data);
     fetchSessions();
-    showToast(
-      `${data.supervisors[0]?.name || "Dosen"} telah bergabung`,
-      "info"
-    );
+
+    const lecturerName = data.supervisors?.[0]?.name || "Dosen pembimbing";
+    showToast(`${lecturerName} telah bergabung`, "info");
   });
 
-  // Event: Secondary lecturer join
+  // Event: Secondary lecturer joined
   on("secondary_lecturer_joined", (data: any) => {
-    console.log("📢 EVENT: secondary_lecturer_joined", data);
+    console.log("📢 [WS] secondary_lecturer_joined:", data);
     fetchSessions();
-    showToast(
-      `${data.supervisors[1]?.name || "Dosen"} telah bergabung`,
-      "info"
-    );
+
+    const lecturerName = data.supervisors?.[1]?.name || "Dosen pembimbing";
+    showToast(`${lecturerName} telah bergabung`, "info");
   });
 
-  // Event: Student join
+  // Event: Student joined
   on("student_joined", (data: any) => {
-    console.log("📢 EVENT: student_joined", data);
+    console.log("📢 [WS] student_joined:", data);
     fetchSessions();
-    showToast(`${data.student_name} bergabung ke sesi`, "info");
+
+    const studentName = data.student_name || "Mahasiswa";
+    showToast(`${studentName} bergabung ke sesi`, "info");
   });
 
   // Event: Session ended
   on("user_ended", (data: any) => {
-    console.log("📢 EVENT: user_ended", data);
+    console.log("📢 [WS] user_ended:", data);
     fetchSessions();
-    showToast("Sesi telah berakhir", "info");
+    showToast("Sesi bimbingan telah berakhir", "info");
   });
 
-  // Event: Someone left
+  // Event: Lecturer left
   on("primary_lecturer_leaved", (data: any) => {
-    console.log("📢 EVENT: primary_lecturer_leaved", data);
+    console.log("📢 [WS] primary_lecturer_leaved:", data);
     fetchSessions();
+
+    const lecturerName = data.supervisors?.[0]?.name || "Dosen pembimbing";
+    showToast(`${lecturerName} telah meninggalkan sesi`, "warning");
   });
 
   on("secondary_lecturer_leaved", (data: any) => {
-    console.log("📢 EVENT: secondary_lecturer_leaved", data);
+    console.log("📢 [WS] secondary_lecturer_leaved:", data);
     fetchSessions();
+
+    const lecturerName = data.supervisors?.[1]?.name || "Dosen pembimbing";
+    showToast(`${lecturerName} telah meninggalkan sesi`, "warning");
   });
 
+  // Event: Student left
   on("student_leaved", (data: any) => {
-    console.log("📢 EVENT: student_leaved", data);
+    console.log("📢 [WS] student_leaved:", data);
     fetchSessions();
+
+    const studentName = data.student_name || "Mahasiswa";
+    showToast(`${studentName} telah meninggalkan sesi`, "warning");
   });
+
+  console.log("✅ All WebSocket listeners registered for Dashboard");
+};
+
+// WebSocket connection manager
+const connectWebSocket = () => {
+  const token = localStorage.getItem("access_token");
+
+  if (!token) {
+    console.error("❌ No access token found");
+    return;
+  }
+
+  if (isConnected.value) {
+    console.log("✅ WebSocket already connected");
+    setupWebSocketListeners();
+    return;
+  }
+
+  console.log("🔌 Connecting WebSocket...");
+  connect(token);
+};
+
+const handleWebSocketReconnect = () => {
+  if (webSocketReconnectAttempts.value >= maxReconnectAttempts) {
+    console.error("❌ Max WebSocket reconnection attempts reached");
+    showToast("Koneksi terputus. Silakan refresh halaman.", "error");
+    return;
+  }
+
+  webSocketReconnectAttempts.value++;
+  console.log(
+    `🔄 Reconnecting WebSocket (attempt ${webSocketReconnectAttempts.value}/${maxReconnectAttempts})`
+  );
+
+  setTimeout(() => {
+    connectWebSocket();
+  }, 2000 * webSocketReconnectAttempts.value); // Exponential backoff
+};
+
+// Refresh data handler
+const refreshData = async () => {
+  if (isRefreshing.value) return;
+
+  try {
+    isRefreshing.value = true;
+    console.log("🔄 Refreshing dashboard data...");
+
+    await Promise.all([fetchNotifications(), fetchSessions()]);
+
+    console.log("✅ Dashboard data refreshed");
+    showToast("Data berhasil diperbarui", "success");
+  } catch (error) {
+    console.error("❌ Failed to refresh data:", error);
+    showToast("Gagal memperbarui data", "error");
+  } finally {
+    isRefreshing.value = false;
+  }
 };
 
 const logout = () => {
+  console.log("👋 Logging out...");
+
+  // Disconnect WebSocket
+  if (isConnected.value) {
+    disconnect();
+  }
+
+  // Clear local storage
   localStorage.clear();
+
+  // Redirect to login
   router.push("/");
 };
 
-// Watch untuk memastikan WebSocket selalu connected
-watch(isConnected, (connected) => {
-  console.log("🔗 WebSocket connection status:", connected);
-  if (connected && !webSocketListenersSetup) {
+// Watch WebSocket connection status
+watch(isConnected, (connected, wasConnected) => {
+  console.log(`🔗 WebSocket status changed: ${wasConnected} → ${connected}`);
+
+  if (connected) {
+    console.log("✅ WebSocket connected");
+    webSocketReconnectAttempts.value = 0; // Reset attempts
     setupWebSocketListeners();
+  } else if (wasConnected !== undefined) {
+    // Only try to reconnect if it was previously connected
+    console.warn("⚠️ WebSocket disconnected");
+    handleWebSocketReconnect();
   }
 });
 
 // Lifecycle
 onMounted(async () => {
-  console.log("=== DASHBOARD MOUNTED ===");
+  console.log("=== 🏠 DASHBOARD MOUNTED ===");
 
-  // Fetch user profile
-  await fetchUserProfile();
-  console.log("✅ User profile loaded");
+  try {
+    // Step 1: Load user profile
+    console.log("1️⃣ Loading user profile...");
+    await fetchUserProfile();
+    console.log("✅ User profile loaded:", {
+      userId: userId.value,
+      userType: userType.value,
+      userName: userName.value,
+    });
+  } catch (error) {
+    console.error("❌ Failed to load user profile:", error);
+    showToast("Gagal memuat profil pengguna", "error");
 
-  // Connect WebSocket
-  const token = localStorage.getItem("access_token");
-  if (token) {
-    console.log("🔌 Connecting WebSocket with token");
-    connect(token);
+    // If profile fails, redirect to login
+    setTimeout(() => {
+      logout();
+    }, 2000);
+    return;
   }
 
-  // Fetch initial data
-  await Promise.all([fetchNotifications(), fetchSessions()]);
-  console.log("✅ Initial data loaded");
+  // Step 2: Connect WebSocket
+  console.log("2️⃣ Connecting WebSocket...");
+  connectWebSocket();
 
-  // Setup listeners jika sudah connected
-  if (isConnected.value) {
-    setupWebSocketListeners();
+  // Step 3: Load initial data
+  console.log("3️⃣ Loading initial data...");
+  try {
+    await Promise.all([fetchNotifications(), fetchSessions()]);
+    console.log("✅ Initial data loaded");
+  } catch (error) {
+    console.error("❌ Failed to load initial data:", error);
+    showToast("Gagal memuat data awal", "error");
   }
+
+  console.log("=== ✅ DASHBOARD INITIALIZATION COMPLETE ===");
 });
 
 onUnmounted(() => {
+  console.log("👋 Dashboard unmounting...");
   webSocketListenersSetup = false;
+
+  // Don't disconnect WebSocket here, keep it alive for navigation
+  // disconnect();
 });
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-50">
+  <div
+    class="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50"
+  >
     <!-- Toast Notifications -->
-    <ToastNotification :toasts="toastNotifications" />
+    <ToastNotification />
 
     <!-- Header -->
     <DashboardHeader
@@ -246,13 +342,55 @@ onUnmounted(() => {
       :user-photo="userPhoto"
       :is-loading="isLoadingProfile"
       @logout="logout"
+      @refresh="refreshData"
     />
 
+    <!-- Loading Overlay -->
+    <div
+      v-if="isLoadingProfile"
+      class="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center"
+    >
+      <div class="bg-white rounded-2xl shadow-2xl p-8 text-center">
+        <div
+          class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-200 border-t-blue-600 mb-4"
+        ></div>
+        <p class="text-gray-700 font-medium">Memuat dashboard...</p>
+      </div>
+    </div>
+
     <!-- Main Content -->
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <!-- Left Column - Progress & Quick Actions -->
-        <div class="lg:col-span-4 space-y-6">
+    <main
+      class="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8"
+    >
+      <!-- Refresh Button (Mobile) -->
+      <div class="flex justify-end mb-4 lg:hidden">
+        <button
+          @click="refreshData"
+          :disabled="isRefreshing"
+          class="flex items-center space-x-2 px-4 py-2 bg-white rounded-xl shadow-sm hover:shadow-md transition-all disabled:opacity-50"
+        >
+          <svg
+            :class="{ 'animate-spin': isRefreshing }"
+            class="w-5 h-5 text-blue-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+            />
+          </svg>
+          <span class="text-sm font-medium text-gray-700">Refresh</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8">
+        <!-- Left Column - Profile, Progress & Quick Actions -->
+        <div class="lg:col-span-4 space-y-4 sm:space-y-6">
+          <!-- Welcome Card -->
           <WelcomeCard
             :user-name="userName"
             :user-type="userType"
@@ -260,8 +398,10 @@ onUnmounted(() => {
             :user-faculty="userFaculty"
             :user-total-student="userTotalStudent"
             :is-loading="isLoadingProfile"
+            class="transform transition-all duration-300 hover:scale-[1.02]"
           />
 
+          <!-- Progress Card -->
           <ProgressCard
             :user-type="userType"
             :total-meetings="progressData.mahasiswa.totalMeetings"
@@ -270,21 +410,50 @@ onUnmounted(() => {
                 ? progressData.mahasiswa.nextSchedule
                 : progressData.dosen.nextSchedule
             "
-          />
-
-          <QuickActions
-            :user-type="userType"
-            @action-click="handleQuickAction"
+            class="transform transition-all duration-300 hover:scale-[1.02]"
           />
         </div>
 
         <!-- Right Column - Notifications & Sessions -->
-        <div class="lg:col-span-8 space-y-6">
+        <div class="lg:col-span-8 space-y-4 sm:space-y-6">
+          <!-- Connection Status Banner (Only show if disconnected) -->
+          <div
+            v-if="!isConnected"
+            class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-xl shadow-sm animate-pulse"
+          >
+            <div class="flex items-center">
+              <svg
+                class="w-5 h-5 text-yellow-400 mr-3"
+                fill="currentColor"
+                viewBox="0 0 20 20"
+              >
+                <path
+                  fill-rule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clip-rule="evenodd"
+                />
+              </svg>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-yellow-800">
+                  Koneksi terputus
+                </p>
+                <p class="text-xs text-yellow-700 mt-1">
+                  Mencoba menghubungkan kembali... ({{
+                    webSocketReconnectAttempts
+                  }}/{{ maxReconnectAttempts }})
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Notifications List -->
           <NotificationsList
             :notifications="notifications"
             :is-loading="isLoadingNotifications"
+            class="transform transition-all duration-300"
           />
 
+          <!-- Recent Sessions -->
           <RecentSessions
             :sessions="sessions"
             :user-type="userType"
@@ -293,28 +462,112 @@ onUnmounted(() => {
             :is-starting-session="isStartingSession"
             @session-click="handleSessionClick"
             @new-session="handleNewSession"
+            class="transform transition-all duration-300"
           />
         </div>
       </div>
     </main>
+
+    <!-- Floating Refresh Button (Desktop) -->
+    <button
+      @click="refreshData"
+      :disabled="isRefreshing"
+      class="hidden lg:flex fixed bottom-8 right-8 items-center justify-center w-14 h-14 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg hover:shadow-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed z-40"
+      title="Refresh data"
+    >
+      <svg
+        :class="{ 'animate-spin': isRefreshing }"
+        class="w-6 h-6"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
+        <path
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          stroke-width="2"
+          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+        />
+      </svg>
+    </button>
   </div>
 </template>
 
 <style scoped>
+/* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
-  border-radius: 2px;
+  background: linear-gradient(180deg, #cbd5e1, #94a3b8);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a8a8a8;
+  background: linear-gradient(180deg, #94a3b8, #64748b);
+}
+
+/* Smooth transitions */
+* {
+  transition-property: transform, opacity, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Prevent transition on page load */
+.no-transition {
+  transition: none !important;
+}
+
+/* Responsive improvements */
+@media (max-width: 640px) {
+  main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+}
+
+/* Animation for cards */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.lg\:col-span-4 > *,
+.lg\:col-span-8 > * {
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* Stagger animation */
+.lg\:col-span-4 > *:nth-child(1) {
+  animation-delay: 0.1s;
+}
+
+.lg\:col-span-4 > *:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.lg\:col-span-4 > *:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.lg\:col-span-8 > *:nth-child(1) {
+  animation-delay: 0.15s;
+}
+
+.lg\:col-span-8 > *:nth-child(2) {
+  animation-delay: 0.25s;
 }
 </style>
