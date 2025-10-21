@@ -20,6 +20,7 @@ export interface MessageResponse {
 
 export interface Message {
   id: string;
+  session_id: string;
   sender: CustomUserResponse;
   is_text: boolean;
   text: string;
