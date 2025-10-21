@@ -330,7 +330,7 @@ onUnmounted(() => {
   <div
     class="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50"
   >
-    <!-- Toast Notifications -->
+    <!-- Toast Notifications (z-index: 60, above header which is 50) -->
     <ToastNotification />
 
     <!-- Header -->
