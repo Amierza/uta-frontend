@@ -180,79 +180,81 @@ const handleEnd = () => {
       </div>
     </div>
 
-    <!-- Mobile Dropdown Menu -->
-    <Transition
-      enter-active-class="transition ease-out duration-100"
-      enter-from-class="transform opacity-0 scale-95"
-      enter-to-class="transform opacity-100 scale-100"
-      leave-active-class="transition ease-in duration-75"
-      leave-from-class="transform opacity-100 scale-100"
-      leave-to-class="transform opacity-0 scale-95"
-    >
-      <div
-        v-if="showMobileMenu"
-        class="sm:hidden absolute top-full right-0 left-0 bg-white border-b border-gray-200 shadow-lg z-50"
+    <teleport to="body">
+      <!-- Mobile Dropdown Menu -->
+      <Transition
+        enter-active-class="transition ease-out duration-100"
+        enter-from-class="transform opacity-0 scale-95"
+        enter-to-class="transform opacity-100 scale-100"
+        leave-active-class="transition ease-in duration-75"
+        leave-from-class="transform opacity-100 scale-100"
+        leave-to-class="transform opacity-0 scale-95"
       >
-        <div class="px-4 py-2 space-y-1">
-          <button
-            v-if="canLeave"
-            @click="handleLeave"
-            class="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
-          >
-            <svg
-              class="w-5 h-5 mr-3 text-gray-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+        <div
+          v-if="showMobileMenu"
+          class="sm:hidden fixed top-16 right-0 left-0 bg-white border-b border-gray-200 shadow-xl z-[9999]"
+        >
+          <div class="px-4 py-2 space-y-1">
+            <button
+              v-if="canLeave"
+              @click="handleLeave"
+              class="w-full flex items-center px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg transition-all"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-              />
-            </svg>
-            Tinggalkan Sesi
-          </button>
+              <svg
+                class="w-5 h-5 mr-3 text-gray-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                />
+              </svg>
+              Tinggalkan Sesi
+            </button>
 
-          <button
-            v-if="canEnd"
-            @click="handleEnd"
-            class="w-full flex items-center px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-50 rounded-lg transition-all"
-          >
-            <svg
-              class="w-5 h-5 mr-3 text-red-500"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+            <button
+              v-if="canEnd"
+              @click="handleEnd"
+              class="w-full flex items-center px-4 py-3 text-sm font-medium text-red-700 hover:bg-red-50 rounded-lg transition-all"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-            Akhiri Sesi
-          </button>
+              <svg
+                class="w-5 h-5 mr-3 text-red-500"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+              Akhiri Sesi
+            </button>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
 
-    <!-- Backdrop Overlay -->
-    <Transition
-      enter-active-class="transition-opacity ease-linear duration-100"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition-opacity ease-linear duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="showMobileMenu"
-        @click="closeMobileMenu"
-        class="sm:hidden fixed inset-0 bg-black/20 z-40"
-      ></div>
-    </Transition>
+      <!-- Backdrop Overlay -->
+      <Transition
+        enter-active-class="transition-opacity ease-linear duration-100"
+        enter-from-class="opacity-0"
+        enter-to-class="opacity-100"
+        leave-active-class="transition-opacity ease-linear duration-100"
+        leave-from-class="opacity-100"
+        leave-to-class="opacity-0"
+      >
+        <div
+          v-if="showMobileMenu"
+          @click="closeMobileMenu"
+          class="sm:hidden fixed inset-0 bg-black/30 z-[9998]"
+        ></div>
+      </Transition>
+    </teleport>
   </div>
 </template>
