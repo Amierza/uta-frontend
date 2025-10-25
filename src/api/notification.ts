@@ -13,3 +13,16 @@ export const getAllNotifications = async (): Promise<
   });
   return response.data;
 };
+
+export const getNotificationDetail = async (
+  notificationId: string
+): Promise<SuccessResponse<NotificationResponse> | ErrorResponse> => {
+  const token = localStorage.getItem("access_token");
+  const response = await api.get(`/notifications/${notificationId}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  return response.data;
+};

@@ -19,12 +19,16 @@ export function useSessions(
   const isStartingSession = ref(false);
   const error = ref<string | null>(null);
 
-  const fetchSessions = async () => {
+  const fetchSessions = async (withPagination: boolean = true) => {
     try {
       isLoadingSessions.value = true;
       error.value = null;
 
-      const response = await getAllSessions();
+      const params = {
+        pagination: withPagination,
+      };
+
+      const response = await getAllSessions(params);
 
       if (response.status && Array.isArray(response.data)) {
         // Filter sessions berdasarkan role

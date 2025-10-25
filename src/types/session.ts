@@ -9,3 +9,9 @@ export interface SessionResponse {
   thesis: ThesisResponse;
   user_owner: UserResponse;
 }
+export interface CustomSessionResponse {
+  id: string;
+  start_time?: string;
+  end_time?: string;
+  status: string;
+}

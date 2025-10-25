@@ -5,6 +5,7 @@ import { useRouter } from "vue-router";
 // Composables
 import { useUser } from "../composables/useUser";
 import { useNotifications } from "../composables/useNotification";
+import { useNotificationDetail } from "../composables/useNotificationDetail";
 import { useSessions } from "../composables/useSession";
 import { useNotificationToast } from "../composables/useNotificationToast";
 import { useWebSocket } from "../composables/useWebsocket";
@@ -16,6 +17,8 @@ import ProgressCard from "../components/ProgressCard.vue";
 import NotificationsList from "../components/NotificationsList.vue";
 import RecentSessions from "../components/RecentSessions.vue";
 import ToastNotification from "../components/ToastNotification.vue";
+import JoinSessionModal from "../components/JoinSessionModal.vue";
+import type { SessionResponse } from "../types/session";
 
 const router = useRouter();
 
@@ -36,6 +39,8 @@ const {
 
 const { notifications, isLoadingNotifications, fetchNotifications } =
   useNotifications(userId);
+
+const { fetchNotificationDetail } = useNotificationDetail();
 
 const {
   sessions,
@@ -65,18 +70,45 @@ const isRefreshing = ref(false);
 const webSocketReconnectAttempts = ref(0);
 const maxReconnectAttempts = 5;
 
+// Join Session Modal State
+const showJoinModal = ref(false);
+const isJoiningSession = ref(false);
+
 // WebSocket state tracker
 let webSocketListenersSetup = false;
 
-const handleSessionClick = async (sessionId: string) => {
+const handleSessionClick = async (session: SessionResponse) => {
   try {
-    console.log("🔗 Joining session:", sessionId);
-    await joinActiveSession(sessionId);
-    router.push(`/session/${sessionId}`);
+    const status = session.status.toLowerCase();
+
+    console.log("🔗 Session clicked:", {
+      id: session.id,
+      status: status,
+      userType: userType.value,
+    });
+
+    // If session is finished/completed, just view it (no need to join)
+    if (status === "finished" || status === "completed") {
+      console.log("👁️ Viewing finished session - no join needed");
+      router.push(`/session/${session.id}`);
+      return;
+    }
+
+    // If session is waiting or ongoing, need to join first
+    if (status === "waiting" || status === "ongoing") {
+      console.log("🚪 Joining active session");
+      await joinActiveSession(session.id);
+      router.push(`/session/${session.id}`);
+      return;
+    }
+
+    // Default: just navigate
+    console.log("📄 Navigating to session");
+    router.push(`/session/${session.id}`);
   } catch (error: any) {
-    console.error("❌ Failed to join session:", error);
+    console.error("❌ Failed to handle session click:", error);
     showToast(
-      error.message || "Gagal bergabung ke sesi. Silakan coba lagi.",
+      error.message || "Gagal mengakses sesi. Silakan coba lagi.",
       "error"
     );
   }
@@ -108,6 +140,65 @@ const handleNewSession = async () => {
   }
 };
 
+// Handle join with session ID (for dosen)
+const handleJoinWithId = () => {
+  showJoinModal.value = true;
+};
+
+const handleJoinModalClose = () => {
+  showJoinModal.value = false;
+};
+
+const handleJoinSession = async (sessionId: string) => {
+  try {
+    isJoiningSession.value = true;
+    console.log("🔗 Joining session with ID:", sessionId);
+
+    await joinActiveSession(sessionId);
+
+    showToast("Berhasil bergabung ke sesi!", "success");
+    showJoinModal.value = false;
+
+    // Navigate to session
+    router.push(`/session/${sessionId}`);
+  } catch (error: any) {
+    console.error("❌ Failed to join session:", error);
+    showToast(
+      error.message || "Gagal bergabung ke sesi. Periksa Session ID Anda.",
+      "error"
+    );
+  } finally {
+    isJoiningSession.value = false;
+  }
+};
+
+// Notification handlers
+const handleNotificationClick = async (notificationId: string) => {
+  try {
+    console.log("🔔 Fetching notification detail:", notificationId);
+
+    // Fetch detail - backend will automatically mark as read
+    const detailData = await fetchNotificationDetail(notificationId);
+
+    // Update notification in list with correct data from detail
+    const index = notifications.value.findIndex((n) => n.id === notificationId);
+    if (index !== -1 && detailData) {
+      notifications.value[index] = {
+        ...notifications.value[index],
+        ...detailData,
+        is_read: true,
+      };
+    }
+
+    // Don't fetch all notifications, just update the one we clicked
+    // await fetchNotifications(); // REMOVE THIS LINE
+
+    console.log("✅ Notification detail fetched and marked as read");
+  } catch (error: any) {
+    console.error("❌ Error fetching notification detail:", error);
+  }
+};
+
 // WebSocket setup
 const setupWebSocketListeners = () => {
   if (webSocketListenersSetup) {
@@ -121,7 +212,8 @@ const setupWebSocketListeners = () => {
   // Event: Session started
   on("session_started", (data: any) => {
     console.log("📢 [WS] session_started:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications(); // Refresh notifications
 
     const studentName = data.student_name || "Mahasiswa";
     showToast(`${studentName} memulai sesi bimbingan`, "info");
@@ -130,43 +222,50 @@ const setupWebSocketListeners = () => {
   // Event: Primary lecturer joined
   on("primary_lecturer_joined", (data: any) => {
     console.log("📢 [WS] primary_lecturer_joined:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications();
   });
 
   // Event: Secondary lecturer joined
   on("secondary_lecturer_joined", (data: any) => {
     console.log("📢 [WS] secondary_lecturer_joined:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications();
   });
 
   // Event: Student joined
   on("student_joined", (data: any) => {
     console.log("📢 [WS] student_joined:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications();
   });
 
   // Event: Session ended
   on("user_ended", (data: any) => {
     console.log("📢 [WS] user_ended:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications();
     showToast("Sesi bimbingan telah berakhir", "info");
   });
 
   // Event: Lecturer left
   on("primary_lecturer_leaved", (data: any) => {
     console.log("📢 [WS] primary_lecturer_leaved:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications();
   });
 
   on("secondary_lecturer_leaved", (data: any) => {
     console.log("📢 [WS] secondary_lecturer_leaved:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications();
   });
 
   // Event: Student left
   on("student_leaved", (data: any) => {
     console.log("📢 [WS] student_leaved:", data);
-    fetchSessions();
+    fetchSessions(false);
+    fetchNotifications();
   });
 
   console.log("✅ All WebSocket listeners registered for Dashboard");
@@ -205,7 +304,7 @@ const handleWebSocketReconnect = () => {
 
   setTimeout(() => {
     connectWebSocket();
-  }, 2000 * webSocketReconnectAttempts.value); // Exponential backoff
+  }, 2000 * webSocketReconnectAttempts.value);
 };
 
 // Refresh data handler
@@ -216,7 +315,7 @@ const refreshData = async () => {
     isRefreshing.value = true;
     console.log("🔄 Refreshing dashboard data...");
 
-    await Promise.all([fetchNotifications(), fetchSessions()]);
+    await Promise.all([fetchNotifications(), fetchSessions(false)]);
 
     console.log("✅ Dashboard data refreshed");
     showToast("Data berhasil diperbarui", "success");
@@ -231,15 +330,11 @@ const refreshData = async () => {
 const logout = () => {
   console.log("👋 Logging out...");
 
-  // Disconnect WebSocket
   if (isConnected.value) {
     disconnect();
   }
 
-  // Clear local storage
   localStorage.clear();
-
-  // Redirect to login
   router.push("/");
 };
 
@@ -249,10 +344,9 @@ watch(isConnected, (connected, wasConnected) => {
 
   if (connected) {
     console.log("✅ WebSocket connected");
-    webSocketReconnectAttempts.value = 0; // Reset attempts
+    webSocketReconnectAttempts.value = 0;
     setupWebSocketListeners();
   } else if (wasConnected !== undefined) {
-    // Only try to reconnect if it was previously connected
     console.warn("⚠️ WebSocket disconnected");
     handleWebSocketReconnect();
   }
@@ -263,7 +357,6 @@ onMounted(async () => {
   console.log("=== 🏠 DASHBOARD MOUNTED ===");
 
   try {
-    // Step 1: Load user profile
     console.log("1️⃣ Loading user profile...");
     await fetchUserProfile();
     console.log("✅ User profile loaded:", {
@@ -275,21 +368,18 @@ onMounted(async () => {
     console.error("❌ Failed to load user profile:", error);
     showToast("Gagal memuat profil pengguna", "error");
 
-    // If profile fails, redirect to login
     setTimeout(() => {
       logout();
     }, 2000);
     return;
   }
 
-  // Step 2: Connect WebSocket
   console.log("2️⃣ Connecting WebSocket...");
   connectWebSocket();
 
-  // Step 3: Load initial data
   console.log("3️⃣ Loading initial data...");
   try {
-    await Promise.all([fetchNotifications(), fetchSessions()]);
+    await Promise.all([fetchNotifications(), fetchSessions(false)]);
     console.log("✅ Initial data loaded");
   } catch (error) {
     console.error("❌ Failed to load initial data:", error);
@@ -302,9 +392,6 @@ onMounted(async () => {
 onUnmounted(() => {
   console.log("👋 Dashboard unmounting...");
   webSocketListenersSetup = false;
-
-  // Don't disconnect WebSocket here, keep it alive for navigation
-  // disconnect();
 });
 </script>
 
@@ -312,8 +399,16 @@ onUnmounted(() => {
   <div
     class="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50"
   >
-    <!-- Toast Notifications (z-index: 60, above header which is 50) -->
+    <!-- Toast Notifications -->
     <ToastNotification />
+
+    <!-- Join Session Modal -->
+    <JoinSessionModal
+      :is-open="showJoinModal"
+      :is-joining="isJoiningSession"
+      @close="handleJoinModalClose"
+      @join="handleJoinSession"
+    />
 
     <!-- Header -->
     <DashboardHeader
@@ -407,7 +502,7 @@ onUnmounted(() => {
           <NotificationsList
             :notifications="notifications"
             :is-loading="isLoadingNotifications"
-            class="transform transition-all duration-300"
+            @notification-click="handleNotificationClick"
           />
 
           <!-- Recent Sessions -->
@@ -419,7 +514,7 @@ onUnmounted(() => {
             :is-starting-session="isStartingSession"
             @session-click="handleSessionClick"
             @new-session="handleNewSession"
-            class="transform transition-all duration-300"
+            @join-with-id="handleJoinWithId"
           />
         </div>
       </div>

@@ -134,56 +134,76 @@ const progressText = computed(() => {
 
 <template>
   <div
-    class="group relative p-4 rounded-xl hover:bg-gray-50 cursor-pointer transition-all duration-200 border border-transparent hover:border-gray-200 hover:shadow-sm"
+    class="group relative p-3 sm:p-4 rounded-xl hover:bg-gray-50 cursor-pointer transition-all duration-200 border border-transparent hover:border-gray-200 hover:shadow-sm"
   >
-    <div class="flex items-start gap-4">
+    <div class="flex items-start gap-3 sm:gap-4">
       <!-- Participants Avatar -->
-      <ParticipantsAvatar
-        :participants="participants"
-        :is-active="session.status === 'active'"
-      />
+      <div class="flex-shrink-0">
+        <ParticipantsAvatar
+          :participants="participants"
+          :is-active="session.status === 'active'"
+        />
+      </div>
 
       <!-- Content -->
       <div class="flex-1 min-w-0">
         <!-- Title & Time -->
-        <div class="flex items-start justify-between gap-3 mb-2">
+        <div class="flex items-start justify-between gap-2 mb-2">
           <div class="flex-1 min-w-0">
             <h4
-              class="font-semibold text-gray-900 truncate group-hover:text-blue-600 transition-colors"
+              class="font-semibold text-sm sm:text-base text-gray-900 truncate group-hover:text-blue-600 transition-colors"
             >
               {{ groupTitle }}
             </h4>
-            <p class="text-sm text-gray-600 truncate mt-0.5">
+            <p
+              class="text-xs sm:text-sm text-gray-600 truncate mt-0.5 leading-tight"
+            >
               {{ session.thesis.title }}
             </p>
           </div>
-          <span class="text-xs text-gray-500 whitespace-nowrap flex-shrink-0">
-            {{ formatTime(session.start_time || "") }}
+          <span
+            class="text-[10px] sm:text-xs text-gray-500 whitespace-nowrap flex-shrink-0 mt-0.5"
+          >
+            {{
+              session.start_time
+                ? formatTime(session.start_time)
+                : "Baru saja dibuat"
+            }}
           </span>
         </div>
 
         <!-- Meta Info -->
-        <div class="flex items-center gap-2 flex-wrap">
+        <div class="flex items-center gap-1.5 sm:gap-2 flex-wrap">
           <!-- Status Badge -->
           <span
             :class="[
-              'inline-flex items-center text-xs px-2.5 py-1 rounded-md border font-medium',
+              'inline-flex items-center text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md border font-medium',
               statusConfig.bg,
               statusConfig.text,
               statusConfig.border,
             ]"
           >
             <span
-              :class="['w-1.5 h-1.5 rounded-full mr-1.5', statusConfig.dot]"
+              :class="[
+                'w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full mr-1 sm:mr-1.5',
+                statusConfig.dot,
+              ]"
             ></span>
-            {{ statusConfig.label }}
+            <span class="hidden xs:inline">{{ statusConfig.label }}</span>
+            <span class="xs:hidden">{{
+              statusConfig.label.substring(0, 6)
+            }}</span>
           </span>
 
           <!-- Progress Badge -->
           <span
-            class="inline-flex items-center text-xs bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md border border-blue-100 font-medium"
+            class="inline-flex items-center text-[10px] sm:text-xs bg-blue-50 text-blue-700 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md border border-blue-100 font-medium"
           >
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <svg
+              class="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
               <path
                 d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z"
               />
@@ -193,9 +213,13 @@ const progressText = computed(() => {
 
           <!-- Participants Count -->
           <span
-            class="inline-flex items-center text-xs text-gray-500 px-2.5 py-1 rounded-md bg-gray-50 border border-gray-100"
+            class="inline-flex items-center text-[10px] sm:text-xs text-gray-500 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-md bg-gray-50 border border-gray-100"
           >
-            <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+            <svg
+              class="w-2.5 h-2.5 sm:w-3 sm:h-3 mr-0.5 sm:mr-1"
+              fill="currentColor"
+              viewBox="0 0 20 20"
+            >
               <path
                 d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"
               />
@@ -205,9 +229,9 @@ const progressText = computed(() => {
         </div>
       </div>
 
-      <!-- Arrow Icon -->
+      <!-- Arrow Icon - Hidden on mobile, visible on hover desktop -->
       <div
-        class="flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity"
+        class="hidden sm:flex flex-shrink-0 self-center opacity-0 group-hover:opacity-100 transition-opacity"
       >
         <svg
           class="w-5 h-5 text-gray-400"
@@ -226,3 +250,25 @@ const progressText = computed(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Custom breakpoint for extra small devices */
+@media (min-width: 375px) {
+  .xs\:inline {
+    display: inline;
+  }
+  .xs\:hidden {
+    display: none;
+  }
+}
+
+/* Default for smaller than 375px */
+@media (max-width: 374px) {
+  .xs\:inline {
+    display: none;
+  }
+  .xs\:hidden {
+    display: inline;
+  }
+}
+</style>

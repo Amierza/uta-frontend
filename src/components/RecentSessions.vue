@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineEmits } from "vue";
+import { defineEmits, computed } from "vue";
 import { useRouter } from "vue-router";
 import type { SessionResponse } from "../types/session";
 import SessionCard from "./SessionCard.vue";
@@ -14,13 +14,47 @@ interface Props {
 
 const router = useRouter();
 
-// Langsung destructure props tanpa assign ke variable
-defineProps<Props>();
+const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  sessionClick: [sessionId: string];
+  sessionClick: [session: SessionResponse];
   newSession: [];
+  joinWithId: [];
 }>();
+
+// Computed: Sort sessions - pending/waiting first for dosen
+const sortedSessions = computed(() => {
+  if (props.userType === "dosen") {
+    // For dosen: prioritize pending/waiting sessions
+    return [...props.sessions].sort((a, b) => {
+      const statusPriority: Record<string, number> = {
+        waiting: 0,
+        ongoing: 1,
+        finished: 2,
+      };
+
+      const priorityA = statusPriority[a.status.toLowerCase()] ?? 1;
+      const priorityB = statusPriority[b.status.toLowerCase()] ?? 1;
+
+      // If same priority, sort by date (newest first)
+      if (priorityA === priorityB) {
+        return (
+          new Date(b.start_time || "").getTime() -
+          new Date(a.start_time || "").getTime()
+        );
+      }
+
+      return priorityA - priorityB;
+    });
+  }
+
+  // For mahasiswa: keep original order (newest first)
+  return props.sessions;
+});
+
+const handleSessionClick = (session: SessionResponse) => {
+  emit("sessionClick", session);
+};
 
 // Navigate to all sessions page
 const goToAllSessions = () => {
@@ -101,6 +135,7 @@ const goToAllSessions = () => {
         }}
       </p>
       <button
+        v-if="userType === 'mahasiswa'"
         @click="emit('newSession')"
         :disabled="isStartingSession"
         class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -130,17 +165,20 @@ const goToAllSessions = () => {
     <!-- Sessions List -->
     <div v-else class="space-y-3">
       <SessionCard
-        v-for="session in sessions.slice(0, 3)"
+        v-for="session in sortedSessions.slice(0, 3)"
         :key="session.id"
         :session="session"
         :user-type="userType"
         :user-id="userId"
-        @click="emit('sessionClick', session.id)"
+        @click="handleSessionClick(session)"
       />
     </div>
 
-    <!-- Start New Session Button -->
-    <div v-if="sessions.length > 0" class="mt-6 pt-6 border-t border-gray-100">
+    <!-- Start New Session Button (Only for Mahasiswa) -->
+    <div
+      v-if="sessions.length > 0 && userType === 'mahasiswa'"
+      class="mt-6 pt-6 border-t border-gray-100"
+    >
       <button
         @click="emit('newSession')"
         :disabled="isStartingSession"
@@ -165,12 +203,34 @@ const goToAllSessions = () => {
           />
         </svg>
         <span>{{
-          isStartingSession
-            ? "Memulai sesi..."
-            : userType === "mahasiswa"
-            ? "Mulai Sesi Bimbingan Baru"
-            : "Mulai Sesi dengan Mahasiswa"
+          isStartingSession ? "Memulai sesi..." : "Mulai Sesi Bimbingan Baru"
         }}</span>
+      </button>
+    </div>
+
+    <!-- Join with Session ID Button (Only for Dosen) -->
+    <div
+      v-if="sessions.length > 0 && userType === 'dosen'"
+      class="mt-6 pt-6 border-t border-gray-100"
+    >
+      <button
+        @click="emit('joinWithId')"
+        class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3.5 px-4 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 flex items-center justify-center space-x-2 font-medium shadow-sm hover:shadow-md"
+      >
+        <svg
+          class="w-5 h-5"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+          />
+        </svg>
+        <span>Bergabung dengan Session ID</span>
       </button>
     </div>
   </div>

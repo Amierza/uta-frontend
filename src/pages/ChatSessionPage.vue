@@ -26,6 +26,12 @@ const router = useRouter();
 const sessionId = route.params.session_id as string;
 const isProcessingEnd = ref(false);
 
+// Modal states
+const showLeaveModal = ref(false);
+const showEndModal = ref(false);
+const isLeavingSession = ref(false);
+const isEndingSession = ref(false);
+
 // Composables
 const { userId, userType, userName, userIdentifier, fetchUserProfile } =
   useUser();
@@ -139,40 +145,60 @@ const getReplyToSenderName = (message: Message): string => {
   return parentMessage ? getSenderName(parentMessage) : "";
 };
 
-// Actions
-const handleLeaveSession = async (): Promise<void> => {
-  if (confirm("Apakah Anda yakin ingin meninggalkan sesi ini?")) {
-    try {
-      await leaveSessionApi(sessionId);
-      router.push("/dashboard");
-    } catch (error: any) {
-      console.error("Failed to leave session:", error);
-    }
+// Actions - Show modals
+const handleLeaveSessionClick = (): void => {
+  showLeaveModal.value = true;
+};
+
+const handleEndSessionClick = (): void => {
+  showEndModal.value = true;
+};
+
+// Confirm leave session
+const confirmLeaveSession = async (): Promise<void> => {
+  try {
+    isLeavingSession.value = true;
+    await leaveSessionApi(sessionId);
+    showLeaveModal.value = false;
+    toastWrapper("Anda telah meninggalkan sesi", "success");
+    router.push("/dashboard");
+  } catch (error: any) {
+    console.error("Failed to leave session:", error);
+    toastWrapper("Gagal meninggalkan sesi", "error");
+  } finally {
+    isLeavingSession.value = false;
   }
 };
 
-const handleEndSession = async (): Promise<void> => {
-  if (
-    confirm(
-      "Apakah Anda yakin ingin mengakhiri sesi ini? AI akan memproses ringkasan percakapan."
-    )
-  ) {
-    try {
-      // Show processing screen
-      isProcessingEnd.value = true;
+// Confirm end session
+const confirmEndSession = async (): Promise<void> => {
+  try {
+    isEndingSession.value = true;
+    showEndModal.value = false;
 
-      // Call API to end session
-      const response = await endSessionApi(sessionId);
+    // Show processing screen
+    isProcessingEnd.value = true;
 
-      console.log("✅ Session ended:", response);
+    // Call API to end session
+    const response = await endSessionApi(sessionId);
+    console.log("✅ Session ended:", response);
 
-      // Processing screen will handle the redirect
-    } catch (error: any) {
-      console.error("Failed to end session:", error);
-      isProcessingEnd.value = false;
-      toastWrapper("Gagal mengakhiri sesi.", "error");
-    }
+    // Processing screen will handle the redirect
+  } catch (error: any) {
+    console.error("Failed to end session:", error);
+    isProcessingEnd.value = false;
+    isEndingSession.value = false;
+    toastWrapper("Gagal mengakhiri sesi.", "error");
   }
+};
+
+// Cancel modals
+const cancelLeaveSession = (): void => {
+  showLeaveModal.value = false;
+};
+
+const cancelEndSession = (): void => {
+  showEndModal.value = false;
 };
 
 const handleProcessingComplete = () => {
@@ -238,6 +264,177 @@ onUnmounted(() => {
     @complete="handleProcessingComplete"
   />
 
+  <!-- Leave Session Modal -->
+  <Transition name="modal">
+    <div
+      v-if="showLeaveModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      @click.self="cancelLeaveSession"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all"
+        @click.stop
+      >
+        <!-- Icon -->
+        <div class="pt-8 pb-4 px-6 text-center">
+          <div
+            class="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <svg
+              class="w-8 h-8 text-yellow-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+              />
+            </svg>
+          </div>
+
+          <h3 class="text-xl font-bold text-gray-900 mb-2">Tinggalkan Sesi?</h3>
+          <p class="text-sm text-gray-600">
+            Apakah Anda yakin ingin meninggalkan sesi bimbingan ini? Anda dapat
+            bergabung kembali jika sesi masih berlangsung.
+          </p>
+        </div>
+
+        <!-- Actions -->
+        <div class="px-6 pb-6 flex gap-3">
+          <button
+            @click="cancelLeaveSession"
+            :disabled="isLeavingSession"
+            class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            @click="confirmLeaveSession"
+            :disabled="isLeavingSession"
+            class="flex-1 px-4 py-3 bg-yellow-500 hover:bg-yellow-600 text-white font-medium rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <div
+              v-if="isLeavingSession"
+              class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+            ></div>
+            <span>{{
+              isLeavingSession ? "Meninggalkan..." : "Ya, Tinggalkan"
+            }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
+  <!-- End Session Modal -->
+  <Transition name="modal">
+    <div
+      v-if="showEndModal"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      @click.self="cancelEndSession"
+    >
+      <div
+        class="bg-white rounded-2xl shadow-2xl max-w-md w-full transform transition-all"
+        @click.stop
+      >
+        <!-- Icon -->
+        <div class="pt-8 pb-4 px-6 text-center">
+          <div
+            class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4"
+          >
+            <svg
+              class="w-8 h-8 text-red-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </div>
+
+          <h3 class="text-xl font-bold text-gray-900 mb-2">Akhiri Sesi?</h3>
+          <p class="text-sm text-gray-600 mb-4">
+            Apakah Anda yakin ingin mengakhiri sesi bimbingan ini?
+          </p>
+
+          <!-- Info Box -->
+          <div
+            class="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left"
+          >
+            <div class="flex items-start gap-3">
+              <div class="flex-shrink-0 mt-0.5">
+                <svg
+                  class="w-5 h-5 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div class="flex-1">
+                <h4 class="text-sm font-semibold text-blue-900 mb-1">
+                  Yang akan terjadi:
+                </h4>
+                <ul class="text-xs text-blue-800 space-y-1">
+                  <li class="flex items-start gap-2">
+                    <span class="text-blue-600 mt-0.5">•</span>
+                    <span>Sesi akan ditutup untuk semua peserta</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <span class="text-blue-600 mt-0.5">•</span>
+                    <span>AI akan memproses ringkasan percakapan</span>
+                  </li>
+                  <li class="flex items-start gap-2">
+                    <span class="text-blue-600 mt-0.5">•</span>
+                    <span>Hasil ringkasan dapat dilihat di riwayat sesi</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="px-6 pb-6 flex gap-3">
+          <button
+            @click="cancelEndSession"
+            :disabled="isEndingSession"
+            class="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors disabled:opacity-50"
+          >
+            Batal
+          </button>
+          <button
+            @click="confirmEndSession"
+            :disabled="isEndingSession"
+            class="flex-1 px-4 py-3 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-medium rounded-xl transition-all shadow-lg shadow-red-500/30 disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            <div
+              v-if="isEndingSession"
+              class="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"
+            ></div>
+            <span>{{
+              isEndingSession ? "Mengakhiri..." : "Ya, Akhiri Sesi"
+            }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </Transition>
+
   <!-- Toast Notifications -->
   <ToastNotification />
 
@@ -255,9 +452,9 @@ onUnmounted(() => {
       :is-session-owner="isSessionOwner"
       :can-leave="canLeaveSession"
       :can-end="canEndSession"
-      @back="router.push('/dashboard')"
-      @leave="handleLeaveSession"
-      @end="handleEndSession"
+      @back="router.back()"
+      @leave="handleLeaveSessionClick"
+      @end="handleEndSessionClick"
     />
 
     <!-- Loading State -->
@@ -397,5 +594,27 @@ onUnmounted(() => {
 
 #chatContainer {
   scroll-behavior: smooth;
+}
+
+/* Modal Transitions */
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
+}
+
+.modal-enter-active > div,
+.modal-leave-active > div {
+  transition: all 0.3s ease;
+}
+
+.modal-enter-from > div,
+.modal-leave-to > div {
+  transform: scale(0.9);
+  opacity: 0;
 }
 </style>
