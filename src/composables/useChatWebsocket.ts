@@ -224,7 +224,6 @@ export const useChatWebSocket = (
         is_text: data.is_text || true,
         text: data.text || "",
         file_url: data.file_url || null,
-        file_type: data.file_type || null,
         sender: {
           id: data.sender.id,
           name: data.sender.name || "Unknown",
