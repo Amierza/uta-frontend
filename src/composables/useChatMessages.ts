@@ -1,5 +1,6 @@
 import { ref, computed, nextTick, type Ref } from "vue";
 import { sendMessage, getMessages } from "../api/message";
+import { uploadFiles } from "../api/upload";
 import { formatDate } from "../utils";
 import type { Message, GroupedMessages } from "../types/message";
 import type { SendMessageRequest } from "../types/message";
@@ -22,21 +23,18 @@ export const useChatMessages = (
   const groupedMessages = computed<GroupedMessages>(() => {
     const groups: GroupedMessages = {};
 
-    // Tambahkan validasi untuk memastikan messages ada dan valid
     if (!messages.value || messages.value.length === 0) {
       return groups;
     }
 
     messages.value.forEach((msg) => {
-      // Validasi timestamp sebelum format
       if (!msg.timestamp) {
         console.warn("Message without timestamp:", msg);
-        return; // Skip message ini
+        return;
       }
 
       const dateKey = formatDate(msg.timestamp);
 
-      // Skip jika formatDate gagal
       if (dateKey === "Invalid Date") {
         console.warn("Invalid date for message:", msg);
         return;
@@ -68,10 +66,6 @@ export const useChatMessages = (
 
       if (response.status && Array.isArray(response.data)) {
         console.log("📦 Raw messages from API:", response.data.length);
-        console.log(
-          "📦 RAW API Response:",
-          JSON.stringify(response.data[0], null, 2)
-        );
 
         const messagesData = response.data.map((msg: any) => {
           const sender: CustomUserResponse = {
@@ -81,8 +75,6 @@ export const useChatMessages = (
             role: msg.sender.role || "student",
           };
 
-          console.log("✅ Created sender object:", sender);
-
           return {
             id: msg.id,
             session_id: msg.session_id || sessionId,
@@ -90,14 +82,12 @@ export const useChatMessages = (
             is_text: msg.is_text,
             text: msg.text || "",
             file_url: msg.file_url || null,
-            file_type: msg.file_type || null,
             parent_message_id: msg.parent_message_id || null,
             timestamp: msg.timestamp || new Date().toISOString(),
             is_sending: false,
           };
         });
 
-        // Sort messages by timestamp
         messages.value = messagesData.sort(
           (a, b) =>
             new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
@@ -105,7 +95,6 @@ export const useChatMessages = (
 
         console.log("✅ Messages loaded and sorted:", messages.value.length);
 
-        // Scroll after render
         nextTick(() => {
           scrollToBottom();
         });
@@ -120,13 +109,15 @@ export const useChatMessages = (
     }
   };
 
-  const handleSendMessage = async (): Promise<void> => {
-    if (!newMessage.value.trim() || isSending.value) return;
-
+  const handleSendMessage = async (files?: File[]): Promise<void> => {
     const messageText = newMessage.value.trim();
+    const hasText = messageText.length > 0;
+    const hasFiles = files && files.length > 0;
+
+    if ((!hasText && !hasFiles) || isSending.value) return;
+
     const parentId = replyingTo.value?.id;
 
-    // Create temp sender with current user data
     const tempSender: CustomUserResponse = {
       id: userId.value,
       name: userName.value,
@@ -138,16 +129,18 @@ export const useChatMessages = (
       userId: userId.value,
       userName: userName.value,
       userType: userType.value,
+      hasFiles: hasFiles,
+      fileCount: files?.length || 0,
     });
 
+    // Create temp message
     const tempMessage: Message = {
       id: `temp-${Date.now()}`,
       session_id: sessionId,
       sender: tempSender,
-      is_text: true,
-      text: messageText,
+      is_text: hasText && !hasFiles, // Only true if has text and no files
+      text: hasText ? messageText : hasFiles ? "📎 Mengirim file..." : "",
       file_url: null,
-      file_type: null,
       parent_message_id: parentId || null,
       timestamp: new Date().toISOString(),
       is_sending: true,
@@ -161,14 +154,37 @@ export const useChatMessages = (
     isSending.value = true;
 
     try {
+      let fileUrl: string | null = null;
+
+      // Upload files first if exists
+      if (hasFiles && files) {
+        console.log("📤 Uploading files...");
+        const uploadResponse = await uploadFiles(files);
+
+        if (uploadResponse.length > 0) {
+          fileUrl = uploadResponse[0]; // Use first uploaded file URL
+          console.log("✅ File uploaded:", fileUrl);
+        }
+      }
+
+      // Determine is_text based on whether we have a file
+      const isTextMessage = hasText && !fileUrl;
+
+      // Send message with or without file
       const payload: SendMessageRequest = {
-        is_text: true,
-        text: messageText,
+        is_text: isTextMessage, // false if file exists, true if only text
+        text: hasText ? messageText : fileUrl ? "📎 File" : "",
       };
 
       if (parentId) {
         payload.parent_message_id = parentId;
       }
+
+      if (fileUrl) {
+        payload.file_url = fileUrl;
+      }
+
+      console.log("📤 Payload:", payload);
 
       await sendMessage(sessionId, payload);
 
@@ -193,7 +209,13 @@ export const useChatMessages = (
         messages.value.splice(tempIndex, 1);
       }
 
-      newMessage.value = messageText;
+      // Restore message if it was text
+      if (hasText) {
+        newMessage.value = messageText;
+      }
+
+      // Show error
+      alert("Gagal mengirim pesan. Silakan coba lagi.");
     } finally {
       isSending.value = false;
     }
@@ -212,17 +234,14 @@ export const useChatMessages = (
       return;
     }
 
-    // Check if message already exists
     const exists = messages.value.some((m) => m.id === data.id);
     if (exists) {
       console.log("ℹ️ Message already exists, skipping");
       return;
     }
 
-    // Add new message
     messages.value.push(data);
 
-    // Re-sort by timestamp to maintain order
     messages.value.sort(
       (a, b) =>
         new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()

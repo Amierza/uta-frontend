@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
+import { useRouter } from "vue-router";
 import { getInitials, getAvatarColor } from "../utils";
 import type { Participant } from "../types/message";
 
 interface Props {
   sessionTitle: string;
   sessionStatus: string;
+  sessionId: string;
   allParticipants: Participant[];
   totalCount: number;
   userType: string;
@@ -22,6 +24,7 @@ const emit = defineEmits<{
   end: [];
 }>();
 
+const router = useRouter();
 const showMobileMenu = ref(false);
 
 // Check if session is finished
@@ -48,6 +51,10 @@ const handleLeave = () => {
 const handleEnd = () => {
   closeMobileMenu();
   emit("end");
+};
+
+const goToSummary = () => {
+  router.push(`/session/${props.sessionId}/summary`);
 };
 
 // Get status display config
@@ -175,6 +182,29 @@ const statusConfig = computed(() => {
             Owner
           </div>
 
+          <!-- Summary Button (when finished) -->
+          <button
+            v-if="isFinished"
+            @click="goToSummary"
+            class="hidden md:flex items-center px-3 lg:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg lg:rounded-xl transition-all shadow-sm"
+            title="Lihat ringkasan sesi"
+          >
+            <svg
+              class="w-4 h-4 lg:mr-2"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            <span class="hidden lg:inline">Lihat Ringkasan</span>
+          </button>
+
           <!-- Desktop Actions (Only if not finished) -->
           <template v-if="!isFinished">
             <button
@@ -232,6 +262,28 @@ const statusConfig = computed(() => {
               </svg>
             </button>
           </template>
+
+          <!-- Mobile Summary Button (when finished) -->
+          <button
+            v-if="isFinished"
+            @click="goToSummary"
+            class="md:hidden p-1.5 sm:p-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-lg sm:rounded-xl transition-all duration-200 shadow-sm"
+            title="Lihat ringkasan sesi"
+          >
+            <svg
+              class="w-5 h-5 text-white"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+          </button>
         </div>
       </div>
     </div>

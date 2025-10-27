@@ -21,11 +21,24 @@ const showMobileMenu = ref(false);
 
 const toggleMobileMenu = () => {
   showMobileMenu.value = !showMobileMenu.value;
+  // Prevent body scroll when menu is open
+  if (showMobileMenu.value) {
+    document.body.style.overflow = "hidden";
+  } else {
+    document.body.style.overflow = "";
+  }
 };
 
 const handleLogout = () => {
   showMobileMenu.value = false;
+  document.body.style.overflow = "";
   emit("logout");
+};
+
+const handleRefresh = () => {
+  emit("refresh");
+  showMobileMenu.value = false;
+  document.body.style.overflow = "";
 };
 </script>
 
@@ -193,19 +206,39 @@ const handleLogout = () => {
         </div>
       </div>
     </div>
+  </header>
 
-    <!-- Mobile Menu Dropdown -->
-    <transition
-      enter-active-class="transition ease-out duration-200"
-      enter-from-class="opacity-0 -translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-in duration-150"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 -translate-y-2"
+  <!-- Mobile Menu - Using Teleport -->
+  <Teleport to="body">
+    <!-- Backdrop -->
+    <Transition
+      enter-active-class="transition-opacity ease-out duration-300"
+      enter-from-class="opacity-0"
+      enter-to-class="opacity-100"
+      leave-active-class="transition-opacity ease-in duration-200"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
     >
       <div
         v-if="showMobileMenu"
-        class="md:hidden border-t border-gray-200 bg-white shadow-lg"
+        @click="toggleMobileMenu"
+        class="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"
+        aria-hidden="true"
+      ></div>
+    </Transition>
+
+    <!-- Mobile Menu Panel -->
+    <Transition
+      enter-active-class="transition-all ease-out duration-300"
+      enter-from-class="opacity-0 -translate-y-full"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition-all ease-in duration-200"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-full"
+    >
+      <div
+        v-if="showMobileMenu"
+        class="md:hidden fixed top-14 sm:top-16 left-0 right-0 bg-white shadow-2xl z-[70] max-h-[calc(100vh-3.5rem)] sm:max-h-[calc(100vh-4rem)] overflow-y-auto"
       >
         <div class="px-4 py-4 space-y-4">
           <!-- User Info Section -->
@@ -218,7 +251,7 @@ const handleLogout = () => {
                 }&background=3b82f6&color=white`
               "
               alt="Profile"
-              class="w-12 h-12 rounded-full border-2 border-gray-200"
+              class="w-12 h-12 rounded-full border-2 border-gray-200 flex-shrink-0"
             />
             <div class="flex-1 min-w-0">
               <p class="text-sm font-semibold text-gray-900 truncate">
@@ -246,28 +279,27 @@ const handleLogout = () => {
           <div class="space-y-2">
             <!-- Refresh Button -->
             <button
-              @click="
-                () => {
-                  emit('refresh');
-                  showMobileMenu = false;
-                }
-              "
-              class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors text-left"
+              @click="handleRefresh"
+              class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-gray-50 active:bg-gray-100 transition-colors text-left"
             >
-              <svg
-                class="w-5 h-5 text-gray-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <div
+                class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              <div>
+                <svg
+                  class="w-5 h-5 text-blue-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+              </div>
+              <div class="flex-1">
                 <p class="text-sm font-medium text-gray-900">Refresh Data</p>
                 <p class="text-xs text-gray-500">Perbarui data dashboard</p>
               </div>
@@ -276,22 +308,26 @@ const handleLogout = () => {
             <!-- Logout Button -->
             <button
               @click="handleLogout"
-              class="w-full flex items-center space-x-3 px-4 py-3 rounded-lg bg-red-50 hover:bg-red-100 transition-colors text-left"
+              class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl bg-red-50 hover:bg-red-100 active:bg-red-200 transition-colors text-left"
             >
-              <svg
-                class="w-5 h-5 text-red-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+              <div
+                class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
-                />
-              </svg>
-              <div>
+                <svg
+                  class="w-5 h-5 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                  />
+                </svg>
+              </div>
+              <div class="flex-1">
                 <p class="text-sm font-medium text-red-600">Logout</p>
                 <p class="text-xs text-red-500">Keluar dari sistem</p>
               </div>
@@ -309,29 +345,12 @@ const handleLogout = () => {
           </div>
         </div>
       </div>
-    </transition>
-
-    <!-- Mobile Menu Overlay -->
-    <transition
-      enter-active-class="transition ease-out duration-200"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition ease-in duration-150"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="showMobileMenu"
-        @click="showMobileMenu = false"
-        class="md:hidden fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-        aria-hidden="true"
-      ></div>
-    </transition>
-  </header>
+    </Transition>
+  </Teleport>
 </template>
 
 <style scoped>
-/* Ensure header is above other content */
+/* Header styling */
 header {
   backdrop-filter: blur(8px);
   background-color: rgba(255, 255, 255, 0.95);
@@ -347,9 +366,21 @@ button:active {
   transform: scale(0.95);
 }
 
-/* Ensure mobile menu is above overlay */
-.md\:hidden.border-t {
-  position: relative;
-  z-index: 50;
+/* Custom scrollbar for mobile menu */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 2px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
 }
 </style>

@@ -4,7 +4,6 @@ export interface SendMessageRequest {
   is_text: boolean;
   text?: string;
   file_url?: string;
-  file_type?: string;
   parent_message_id?: string;
 }
 
@@ -25,7 +24,6 @@ export interface Message {
   is_text: boolean;
   text: string;
   file_url: string | null;
-  file_type: string | null;
   parent_message_id: string | null;
   timestamp: string;
   is_sending?: boolean;
@@ -50,7 +48,6 @@ export interface WebSocketEventData {
   is_text?: boolean;
   text?: string;
   file_url?: string | null;
-  file_type?: string | null;
   sender: CustomUserResponse;
   session_id?: string;
   parent_message_id?: string | null;

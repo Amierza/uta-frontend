@@ -443,6 +443,7 @@ onUnmounted(() => {
   >
     <!-- Header -->
     <ChatHeader
+      :session-id="sessionId"
       :session-title="sessionTitle"
       :session-status="sessionStatus"
       :all-participants="allParticipants"

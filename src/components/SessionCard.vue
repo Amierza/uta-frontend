@@ -81,7 +81,7 @@ const groupTitle = computed(() => {
 // Get status badge color
 const statusConfig = computed(() => {
   switch (props.session.status) {
-    case "active":
+    case "ongoing":
       return {
         bg: "bg-green-50",
         text: "text-green-700",
@@ -97,7 +97,7 @@ const statusConfig = computed(() => {
         dot: "bg-gray-400",
         label: "Selesai",
       };
-    case "pending":
+    case "waiting":
       return {
         bg: "bg-yellow-50",
         text: "text-yellow-700",

@@ -6,6 +6,7 @@ import WaitingRoomPage from "../pages/WaitingRoomPage.vue";
 import ChatSessionPage from "../pages/ChatSessionPage.vue";
 import NotificationsPage from "../pages/NotificationPage.vue";
 import SessionSummaryPage from "../pages/SessionSummaryPage.vue";
+import SchedulesPage from "../pages/SchedulesPage.vue";
 
 const routes = [
   { path: "/", name: "Login", component: LoginPage },
@@ -58,6 +59,15 @@ const routes = [
     meta: {
       requiresAuth: true,
       title: "Halaman Summary",
+    },
+  },
+  {
+    path: "/schedules",
+    name: "Schedules",
+    component: SchedulesPage,
+    meta: {
+      requiresAuth: true,
+      title: "Penjadwalan Bimbingan",
     },
   },
 ];
