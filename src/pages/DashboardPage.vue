@@ -83,23 +83,38 @@ const approvedSchedules = computed(
 const nextSchedule = computed(() => {
   const now = new Date();
   const upcoming = schedules.value
-    .filter((s) => s.status === "approved" && new Date(s.proposed_at) >= now)
+    .filter((s) => s.status === "approved" && new Date(s.start_time) >= now)
     .sort(
       (a, b) =>
-        new Date(a.proposed_at).getTime() - new Date(b.proposed_at).getTime()
+        new Date(a.start_time).getTime() - new Date(b.start_time).getTime()
     );
   return upcoming[0] || null;
 });
 
-const formatScheduleDate = (dateString: string) => {
-  const date = new Date(dateString);
+const formatScheduleDateShort = (startTime: string) => {
+  const date = new Date(startTime);
   return date.toLocaleDateString("id-ID", {
     weekday: "short",
     day: "numeric",
     month: "short",
+  });
+};
+
+const formatScheduleTime = (startTime: string, endTime: string) => {
+  const start = new Date(startTime);
+  const end = new Date(endTime);
+
+  const startTimeStr = start.toLocaleTimeString("id-ID", {
     hour: "2-digit",
     minute: "2-digit",
   });
+
+  const endTimeStr = end.toLocaleTimeString("id-ID", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  return `${startTimeStr} - ${endTimeStr}`;
 };
 
 // Handlers
@@ -514,8 +529,13 @@ onUnmounted(() => {
             </div>
           </div>
           <p class="text-xs opacity-90 mb-1">Jadwal Berikutnya</p>
-          <p class="text-sm font-bold">
-            {{ formatScheduleDate(nextSchedule.proposed_at) }}
+          <p class="text-sm font-bold leading-tight">
+            {{ formatScheduleDateShort(nextSchedule.start_time) }}
+          </p>
+          <p class="text-xs opacity-90 mt-1">
+            {{
+              formatScheduleTime(nextSchedule.start_time, nextSchedule.end_time)
+            }}
           </p>
         </div>
         <div
