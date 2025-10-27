@@ -7,6 +7,7 @@ import ChatSessionPage from "../pages/ChatSessionPage.vue";
 import NotificationsPage from "../pages/NotificationPage.vue";
 import SessionSummaryPage from "../pages/SessionSummaryPage.vue";
 import SchedulesPage from "../pages/SchedulesPage.vue";
+import ProfilePage from "../pages/ProfilePage.vue";
 
 const routes = [
   { path: "/", name: "Login", component: LoginPage },
@@ -69,6 +70,12 @@ const routes = [
       requiresAuth: true,
       title: "Penjadwalan Bimbingan",
     },
+  },
+  {
+    path: "/profile",
+    name: "Profile",
+    component: ProfilePage,
+    meta: { requiresAuth: true, title: "Halaman Profile" },
   },
 ];
 

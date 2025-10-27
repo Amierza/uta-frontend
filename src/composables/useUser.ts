@@ -9,6 +9,7 @@ export function useUser() {
   const userIdentifier = ref("");
   const userEmail = ref("");
   const userThesisId = ref("");
+  const userLecturerId = ref("");
   const userPhoto = ref("");
   const userTotalStudent = ref(0);
   const userStudyProgram = ref("");
@@ -28,6 +29,7 @@ export function useUser() {
         userType.value = userData.role === "lecturer" ? "dosen" : "mahasiswa";
 
         if (userData.role === "lecturer" && userData.lecturer) {
+          userLecturerId.value = userData.lecturer.id;
           userName.value = userData.lecturer.name;
           userIdentifier.value = userData.lecturer.nip;
           userEmail.value = userData.lecturer.email;
@@ -61,6 +63,7 @@ export function useUser() {
     userId,
     userType,
     userName,
+    userLecturerId,
     userIdentifier,
     userEmail,
     userThesisId,
