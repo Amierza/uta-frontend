@@ -69,9 +69,6 @@ let webSocketListenersSetup = false;
 
 // Computed stats
 const totalSessions = computed(() => sessions.value.length);
-const finishedSessions = computed(
-  () => sessions.value.filter((s) => s.status === "finished").length
-);
 const pendingSchedules = computed(
   () => schedules.value.filter((s) => s.status === "pending").length
 );
@@ -388,7 +385,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Stats Grid -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <!-- Total Sessions -->
         <div
           class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all cursor-pointer"
@@ -417,16 +414,17 @@ onUnmounted(() => {
           <p class="text-xs text-gray-500 mt-1">Total Sesi</p>
         </div>
 
-        <!-- Finished Sessions -->
+        <!-- Total Schedules
         <div
-          class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all"
+          class="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all cursor-pointer"
+          @click="router.push('/schedules')"
         >
           <div class="flex items-center justify-between mb-2">
             <div
-              class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center"
+              class="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center"
             >
               <svg
-                class="w-5 h-5 text-green-600"
+                class="w-5 h-5 text-indigo-600"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -435,14 +433,14 @@ onUnmounted(() => {
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
                 />
               </svg>
             </div>
           </div>
-          <p class="text-2xl font-bold text-gray-900">{{ finishedSessions }}</p>
-          <p class="text-xs text-gray-500 mt-1">Selesai</p>
-        </div>
+          <p class="text-2xl font-bold text-gray-900">{{ schedules.length }}</p>
+          <p class="text-xs text-gray-500 mt-1">Total Jadwal</p>
+        </div> -->
 
         <!-- Approved Schedules -->
         <div
