@@ -72,10 +72,6 @@ function formatRelativeTime(dateString: string): string {
 
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    console.log("Date string:", dateString);
-    console.log("Parsed date:", date.toString());
-    console.log("Diff in seconds:", diffInSeconds);
-
     if (diffInSeconds < 60) return "Baru saja";
     if (diffInSeconds < 3600)
       return `${Math.floor(diffInSeconds / 60)} menit yang lalu`;
@@ -195,7 +191,7 @@ const handleViewAll = () => {
     <!-- Notifications List -->
     <div v-else class="space-y-2">
       <div
-        v-for="notification in validNotifications.slice(0, 3)"
+        v-for="notification in validNotifications.slice(0, 2)"
         :key="notification.id"
         @click="handleNotificationClick(notification)"
         class="flex items-start space-x-3 p-3 rounded-xl hover:bg-gray-50 transition-all cursor-pointer group"
@@ -258,7 +254,7 @@ const handleViewAll = () => {
           @click="handleViewAll"
           class="text-sm text-blue-600 hover:text-blue-800 font-medium"
         >
-          Lihat {{ validNotifications.length - 3 }} notifikasi lainnya
+          Lihat {{ validNotifications.length - 2 }} notifikasi lainnya
         </button>
       </div>
     </div>
